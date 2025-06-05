@@ -6,6 +6,7 @@ from osgeo import gdal
 from multirtc import dem
 from multirtc.sicd import SicdRzdSlc
 
+from multirtc.dem2 import process_dem
 
 gdal.UseExceptions()
 
@@ -21,5 +22,9 @@ def prep_capella(granule_path: Path, work_dir: Optional[Path] = None) -> Path:
         work_dir = Path.cwd()
     capella_sicd = SicdRzdSlc(granule_path)
     dem_path = work_dir / 'dem.tif'
-    dem.download_opera_dem_for_footprint(dem_path, capella_sicd.footprint)
+    if not Path(dem_path).exists():
+        dem.download_opera_dem_for_footprint(dem_path, capella_sicd.footprint)
+    else:
+        process_dem(dem_path)
+
     return capella_sicd, dem_path

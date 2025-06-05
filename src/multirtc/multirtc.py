@@ -1,4 +1,8 @@
 import argparse
+
+import sys
+sys.path.remove(sys.path[0])
+
 from pathlib import Path
 from typing import Optional
 
@@ -109,6 +113,7 @@ def main():
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
+
     args = parser.parse_args()
 
     if args.platform == 'S1':

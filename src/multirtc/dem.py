@@ -12,7 +12,6 @@ from shapely.geometry import LinearRing, Polygon, box
 gdal.UseExceptions()
 URL = 'https://nisar.asf.earthdatacloud.nasa.gov/STATIC/DEM/v1.1/EPSG4326'
 
-
 def check_antimeridean(poly):
     x_min, _, x_max, _ = poly.bounds
 
