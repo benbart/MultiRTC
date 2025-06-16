@@ -4,6 +4,7 @@ from typing import Optional
 
 import isce3
 import numpy as np
+import dask.array as da
 import pyproj
 from numpy.polynomial.polynomial import polyval2d
 from osgeo import gdal
@@ -87,6 +88,13 @@ class SicdSlc:
         ycol = icol * self.spacing[1]
         return xrow, ycol
 
+    def dask_polyval2d(self, xrow, ycol, coeff, chunks=(100,100)):
+        xrow = da.from_array(xrow.astype(np.float32), chunks=chunks)
+        ycol = da.from_array(ycol.astype(np.float32), chunks=chunks)
+        result = da.map_blocks(polyval2d, xrow, ycol, coeff.astype(np.float32), dtype=xrow.dtype)
+        scale_factor = result.compute()
+        return scale_factor
+
     def load_scaled_data(
         self, scale: str, power: bool = False, rowrange: Optional[tuple] = None, colrange: Optional[tuple] = None
     ) -> np.ndarray:
@@ -116,7 +124,7 @@ class SicdSlc:
         else:
             raise ValueError('Both xrange and yrange must be provided or neither.')
 
-        scale_factor = polyval2d(xrow, ycol, coeff)
+        scale_factor = self.dask_polyval2d(xrow, ycol, coeff)
         del xrow, ycol  # deleting for memory management
 
         if power:
