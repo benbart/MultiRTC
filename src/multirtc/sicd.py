@@ -1,6 +1,5 @@
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
 
 import isce3
 import numpy as np
@@ -17,12 +16,6 @@ from multirtc.base import Slc, print_wkt, to_isce_datetime
 
 def check_poly_order(poly):
     assert len(poly.Coefs) == poly.order1 + 1, 'Polynomial order does not match number of coefficients'
-
-
-def calculate_range(scp_ecef, row_uvect, row_shift, arp_ecef):
-    starting_row_pos = scp_ecef + (row_uvect * row_shift)
-    starting_range = np.linalg.norm(arp_ecef - starting_row_pos)
-    return starting_range
 
 
 class SicdSlc:
@@ -62,7 +55,7 @@ class SicdSlc:
         self.supports_static_tropo = False
 
     def get_xrow_ycol(
-        self, rowrange: Optional[tuple] = None, colrange: Optional[tuple] = None
+        self, rowrange: tuple | None = None, colrange: tuple | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate xrow and ycol index arrrays.
 
@@ -96,7 +89,7 @@ class SicdSlc:
         return scale_factor
 
     def load_scaled_data(
-        self, scale: str, power: bool = False, rowrange: Optional[tuple] = None, colrange: Optional[tuple] = None
+        self, scale: str, power: bool = False, rowrange: tuple | None = None, colrange: tuple | None = None
     ) -> np.ndarray:
         """Load scaled data from the SICD file.
 
@@ -176,18 +169,25 @@ class SicdRzdSlc(Slc, SicdSlc):
         self.az_reversed = last_col_time < first_col_time
         self.sensing_start = min(first_col_time, last_col_time)
         self.sensing_end = max(first_col_time, last_col_time)
-        self.starting_range = calculate_range(
-            self.source.GeoData.SCP.ECF.get_array(),
-            self.source.Grid.Row.UVectECF.get_array(),
-            -self.shift[0] * self.spacing[0],
-            self.arp_pos_poly(self.source.RMA.INCA.TimeCAPoly(0)),
-        )
+        self.starting_range = self.get_starting_range(0)
         self.az_reversed = last_col_time < first_col_time
         self.prf = self.shape[1] / (self.sensing_end - self.sensing_start)
         self.orbit = self.get_orbit()
         self.radar_grid = self.get_radar_grid()
         self.doppler_centroid_grid = isce3.core.LUT2d()
         self.supports_rtc = True
+
+    def get_starting_range(self, col: int) -> float:
+        assert 0 <= col < self.shape[1], 'Row index out of bounds'
+        ycol = (col - self.shift[1]) * self.spacing[1]
+        xrow = -self.shift[0] * self.spacing[0]  # fixing to first row
+        inca_time = self.source.RMA.INCA.TimeCAPoly(ycol)
+        arp_pos = self.arp_pos_poly(inca_time)
+        row_offset = self.source.Grid.Row.UVectECF.get_array() * xrow
+        col_offset = self.source.Grid.Col.UVectECF.get_array() * ycol
+        grid_pos = self.source.GeoData.SCP.ECF.get_array() + row_offset + col_offset
+        starting_range = np.linalg.norm(arp_pos - grid_pos)
+        return starting_range
 
     def get_orbit(self) -> isce3.core.Orbit:
         """Define the orbit for the SLC.

@@ -4,7 +4,6 @@ import sys
 sys.path.remove(sys.path[0])
 
 from pathlib import Path
-from typing import Optional
 
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
@@ -20,7 +19,7 @@ from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'CAPELLASP', 'ICEYE']
 
 
-def prep_dirs(work_dir: Optional[Path] = None) -> tuple[Path, Path]:
+def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     """Prepare input and output directories for processing.
 
     Args:
