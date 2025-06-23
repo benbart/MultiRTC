@@ -110,21 +110,24 @@ class SicdSlc:
             raise ValueError(f'Scale must be either "beta0" or "sigma0", got {scale}')
 
         xrow, ycol = self.get_xrow_ycol(rowrange=rowrange, colrange=colrange)
-        if colrange is not None and rowrange is not None:
-            data = self.reader[rowrange[0] : rowrange[1], colrange[0] : colrange[1]]
-        elif colrange is None and rowrange is None:
-            data = self.reader[:, :]
-        else:
-            raise ValueError('Both xrange and yrange must be provided or neither.')
 
         scale_factor = self.dask_polyval2d(xrow, ycol, coeff)
+
         del xrow, ycol  # deleting for memory management
+
+        if colrange is not None and rowrange is not None:
+            data = da.from_array(self.reader[rowrange[0] : rowrange[1], colrange[0] : colrange[1]], chunks=[100,100])
+        elif colrange is None and rowrange is None:
+            data = da.from_array(self.reader[:, :], chunks=[100,100])
+        else:
+            raise ValueError('Both xrange and yrange must be provided or neither.')
 
         if power:
             data = (data.real**2 + data.imag**2) * scale_factor
         else:
             data = data * np.sqrt(scale_factor)
-        return data
+        
+        return data.compute()
 
     def create_complex_beta0(self, outpath: str, row_iter: int = 256) -> None:
         """Create a complex beta0 image from the SICD data.
@@ -295,8 +298,6 @@ class SicdPfaSlc(Slc, SicdSlc):
         """
         polar_ang_poly = self.pfa_vars.PolarAngPoly
         spatial_freq_sf_poly = self.pfa_vars.SpatialFreqSFPoly
-        polar_ang_poly_der = polar_ang_poly.derivative(der_order=1, return_poly=True)
-        spatial_freq_sf_poly_der = spatial_freq_sf_poly.derivative(der_order=1, return_poly=True)
 
         polar_ang_poly_der = polar_ang_poly.derivative(der_order=1, return_poly=True)
         spatial_freq_sf_poly_der = spatial_freq_sf_poly.derivative(der_order=1, return_poly=True)

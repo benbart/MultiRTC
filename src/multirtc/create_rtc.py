@@ -672,6 +672,6 @@ def pfa_prototype_geocode(sicd, geogrid, dem_path, output_dir):
     out_ds.GetRasterBand(1).SetNoDataValue(np.nan)
     out_ds.SetMetadata({'AREA_OR_POINT': 'Area'})
     out_ds = None
-
-    local_epsg = get_point_epsg(geogrid.start_y, geogrid.start_x)
-    gdal.Warp(str(output_path), str(output_path), dstSRS=f'EPSG:{local_epsg}', format='GTiff')
+    # why do you want to re-project to UTM ?
+    # local_epsg = get_point_epsg(geogrid.start_y, geogrid.start_x)
+    # gdal.Warp(str(output_path), str(output_path), dstSRS=f'EPSG:{local_epsg}', format='GTiff')

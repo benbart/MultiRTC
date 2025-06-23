@@ -32,6 +32,7 @@ dependencies = [
     "burst2safe",
     "tqdm",
     "hyp3lib",
+    "dask",
 ]
 dynamic = ["version", "readme"]
 

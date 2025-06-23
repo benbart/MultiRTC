@@ -19,6 +19,7 @@ dependencies:
   - burst2safe
   - tqdm
   - hyp3lib
+  - dask
   # For packaging, and testing
   - setuptools
   - setuptools_scm
