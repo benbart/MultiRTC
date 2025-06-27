@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from osgeo import gdal, ogr, osr
-
+import numpy as np
 from hyp3lib import DemError
 from hyp3lib.util import GDALConfigManager
 import shapely.geometry
@@ -51,9 +51,10 @@ def convert_to_height_above_ellipsoid(dem_file: Path) -> None:
         del geoid_ds
 
         dem_ds = gdal.Open(str(dem_file), gdal.GA_Update)
-        dem_data = dem_ds.GetRasterBand(1).ReadAsArray()
-        dem_data += geoid_data
-        dem_ds.GetRasterBand(1).WriteArray(dem_data)
+        dem_ma = dem_ds.GetRasterBand(1).ReadAsMaskedArray()
+        geoid_ma = np.ma.array(geoid_data, mask=dem_ma.mask)
+        dem_ma += geoid_ma
+        dem_ds.GetRasterBand(1).WriteArray(dem_ma)
         dem_ds.FlushCache()
         del dem_ds
 
@@ -86,7 +87,7 @@ def readgeojsonfile(geojsonfile):
     return polys
 
 
-def download_geodata_coperative_dem_for_footprint(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2) -> None:
+def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
 

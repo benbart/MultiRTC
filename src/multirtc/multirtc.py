@@ -76,7 +76,7 @@ def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path) -
     slc = get_slc(platform, granule, input_dir)
     dem_path = input_dir / 'dem.tif'
     # dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
-    dem2.download_geodata_coperative_dem_for_footprint(dem_path, slc.footprint)
+    dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution)
     if slc.supports_rtc:
