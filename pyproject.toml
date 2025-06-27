@@ -33,6 +33,8 @@ dependencies = [
     "tqdm",
     "hyp3lib",
     "dask",
+    "geojson",
+    "geopandas",
 ]
 dynamic = ["version", "readme"]
 

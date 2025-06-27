@@ -20,6 +20,8 @@ dependencies:
   - tqdm
   - hyp3lib
   - dask
+  - geojson
+  - geopandas
   # For packaging, and testing
   - setuptools
   - setuptools_scm

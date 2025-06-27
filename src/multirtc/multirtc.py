@@ -8,7 +8,7 @@ from pathlib import Path
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
 
-from multirtc import dem
+from multirtc import dem, dem2
 from multirtc.base import Slc
 from multirtc.create_rtc import pfa_prototype_geocode, rtc
 from multirtc.rtc_options import RtcOptions
@@ -75,7 +75,9 @@ def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path) -
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
     dem_path = input_dir / 'dem.tif'
-    dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
+    # dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
+    dem2.download_geodata_coperative_dem_for_footprint(dem_path, slc.footprint)
+
     geogrid = slc.create_geogrid(spacing_meters=resolution)
     if slc.supports_rtc:
         opts = RtcOptions(
