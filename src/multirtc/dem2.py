@@ -124,9 +124,9 @@ def download_geodata_coperative_dem_for_footprint(output_path: Path, footprint: 
 
             result = subprocess.run(['aws','s3', '--profile', 'arctic-traffic', 'cp', f'{url}', f'{temp_dir}/{file}'], capture_output=True, text=True)
 
-            print(result.stdout)
+            print(result.returncode)
 
-            if Path(f'{temp_dir}/{file}').exists():
+            if result.returncode == 0 and Path(f'{temp_dir}/{file}').exists():
                 input_files.append(f'{temp_dir}/{file}')
 
         vrt_filepath = f'{temp_dir}/dem.vrt'
