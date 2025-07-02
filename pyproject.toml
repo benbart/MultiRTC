@@ -35,6 +35,7 @@ dependencies = [
     "dask",
     "geojson",
     "geopandas",
+    "rasterio",
 ]
 dynamic = ["version", "readme"]
 

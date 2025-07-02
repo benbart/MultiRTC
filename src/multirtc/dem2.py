@@ -11,6 +11,11 @@ import geojson
 import json
 import geopandas as gpd
 import subprocess
+import rasterio
+from rasterio.transform import Affine
+from rasterio.mask import mask
+from shapely.geometry import LinearRing, Polygon, box
+
 from multirtc import dem
 
 
@@ -64,13 +69,11 @@ def process_dem(dem_file: Path):
     convert_to_height_above_ellipsoid(dem_file)
 
 
-def polygon2geojsonfile(poly:shapely.geometry.Polygon, geojsonfile):
-    geojson_geometry = shapely.geometry.mapping(poly)
-    geojson_feature = geojson.Feature(geometry=geojson_geometry, properties={"name": "my_polygon"})
-    feature_collection = geojson.FeatureCollection([geojson_feature])
-
-    with open(geojsonfile, 'w') as f:
-        geojson.dump(feature_collection, f, indent=2)
+def polygon2geojsonfile(poly:shapely.geometry.Polygon, geojsonfile, crs:str='EPSG:4326'):
+    geo_series = gpd.GeoSeries([poly])
+    geo_series.crs = crs
+    gdf = gpd.GeoDataFrame({'geometry': geo_series, 'id': [1]})
+    gdf.to_file(geojsonfile, driver="GeoJSON")
 
 
 def readgeojsonfile(geojsonfile):
@@ -139,4 +142,86 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
 
     reproject_to_4326(output_path)
     convert_to_height_above_ellipsoid(output_path)
+
+
+def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
+    with rasterio.open(input_dem) as src:
+        out_image, out_transform = mask(src, [polygon], crop=True)
+        out_meta = src.meta.copy()
+        out_meta.update({
+            "driver": "GTiff",
+            "height": out_image.shape[1],
+            "width": out_image.shape[2],
+            "transform": out_transform
+        })
+
+    with rasterio.open(output_dem, "w", **out_meta) as dest:
+        dest.write(out_image)
+
+
+def padding_dem(input_dem:str, output_dem:str, pad_pixels:list):
+    """
+    pad nodata to the input_dem. The padding area is determined by the buffer length with the same unit
+    as the input_dem. Ideally the buffer is the n*resolution of the input dem.
+    Args:
+        input_dem: input dem file
+        output_dem: output dem file
+        padding: List [pad_left, pad_right, pad_top, pad_bottom], padding pixel numbers of ever side
+    Returns:
+
+    """
+    pad_left, pad_right, pad_top, pad_bottom = pad_pixels
+    src = rasterio.open(input_dem)
+    src_height = src.meta['height']
+    src_width = src.meta['width']
+    src_transform = src.meta['transform']
+    padded_height = src_height + pad_top + pad_bottom
+    padded_width = src_width + pad_left +pad_right
+
+    padded_transform = Affine(
+        src_transform.a, src_transform.b, src_transform.c - (pad_left * src_transform.a),
+        src_transform.d, src_transform.e, src_transform.f - (pad_top * src_transform.e)
+    )
+
+    profile = src.profile
+    profile.update(
+        driver = 'GTiff',
+        height = padded_height,
+        width = padded_width,
+        transform = padded_transform
+    )
+
+    with rasterio.open(output_dem, 'w', **profile) as dst:
+        window_col_start = pad_left
+        window_row_start = pad_top
+        dst.write(src.read(),
+                  window=rasterio.windows.Window(window_col_start, window_row_start, src_width, src_height))
+
+
+def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_dem:str):
+    """
+
+    Args:
+        input_dem: input dem file
+        poly: polygon must be the same crs (EPSG:32606) as the projection (EPSG:32606) of the input_dem
+        output_dem: output dem file
+
+    Returns:
+
+    """
+
+    src = rasterio.open(input_dem)
+    transform = src.profile['transform']
+    poly_src = box(*src.bounds)
+    poly_comb = poly.union(poly_src)
+    src_bounds = poly_src.bounds
+    comb_bounds = poly_comb.bounds
+
+    pad_left = 5 + int((src_bounds[0] - comb_bounds[0])/transform.a)
+    pad_right = 5 + int((comb_bounds[2] - src_bounds[2])/transform.a)
+    pad_top = 5 + int((comb_bounds[1] - src_bounds[1])/transform.e)
+    pad_bottom = 5 + int((src_bounds[3] - comb_bounds[3])/transform.e)
+
+    padding_dem(input_dem, output_dem, [pad_left, pad_right, pad_top, pad_bottom])
+
 
