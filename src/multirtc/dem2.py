@@ -203,14 +203,18 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
 
     Args:
         input_dem: input dem file
-        poly: polygon must be the same crs (EPSG:32606) as the projection (EPSG:32606) of the input_dem
+        poly: polygon is in longitude and latitude (WGS84) geographic coordinate system.
         output_dem: output dem file
 
     Returns:
 
     """
-
+    gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
     src = rasterio.open(input_dem)
+    src_epsg = src.profile['crs'].to_epsg()
+    gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
+    poly = gdf_src.iloc[0]
+
     transform = src.profile['transform']
     poly_src = box(*src.bounds)
     poly_comb = poly.union(poly_src)
