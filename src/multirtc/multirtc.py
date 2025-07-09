@@ -63,13 +63,14 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path) -> None:
+def run_multirtc(platform: str, granule: str, resolution: int, bbox: list, work_dir: Path) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
         platform: Platform type (e.g., 'UMBRA').
         granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
         resolution: Resolution of the output RTC (in meters).
+        bbox: [min_lon, min_lat, max_lon, max_lat], used to clip the raster. default=None
         work_dir: Working directory for processing.
     """
     input_dir, output_dir = prep_dirs(work_dir)
@@ -78,7 +79,7 @@ def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path) -
     # dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
     dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
 
-    geogrid = slc.create_geogrid(spacing_meters=resolution)
+    geogrid = slc.create_geogrid(spacing_meters=resolution, bbox=bbox)
     if slc.supports_rtc:
         opts = RtcOptions(
             dem_path=str(dem_path),
@@ -102,13 +103,15 @@ def main():
     parser.add_argument('platform', choices=SUPPORTED, help='Platform to create RTC for')
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
+    parser.add_argument('--subset', nargs="*", type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
 
     args = parser.parse_args()
 
     if args.work_dir is None:
         args.work_dir = Path.cwd()
-    run_multirtc(args.platform, args.granule, args.resolution, args.work_dir)
+
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir)
 
 
 if __name__ == '__main__':

@@ -228,7 +228,7 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: int, bbox: list = None) -> isce3.product.GeoGridParameters:
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
 
     def _print_wkt(self):
@@ -363,13 +363,13 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: int, bbox: list = None) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
         Args:
             spacing_meters: Spacing in meters for the geogrid.
-
+            poly: polygon to clip the original geos.
         Returns:
             isce3.product.GeoGridParameters: The generated geogrid parameters.
         """
@@ -382,17 +382,24 @@ class SicdPfaSlc(Slc, SicdSlc):
 
         lla_point = (self.center.x, self.center.y)
         utm_point = lla2utm.transform(*lla_point)
-        utm_point_shift = (utm_point[0] + spacing_meters, utm_point[1])
-        lla_point_shift = utm2lla.transform(*utm_point_shift)
-        x_spacing = lla_point_shift[0] - lla_point[0]
-        y_spacing = -1 * x_spacing
+        utm_point_shiftx = (utm_point[0] + spacing_meters, utm_point[1])
+        lla_point_shiftx = utm2lla.transform(*utm_point_shiftx)
+        x_spacing = lla_point_shiftx[0] - lla_point[0]
+
+        utm_point_shifty = (utm_point[0], utm_point[1] - spacing_meters)
+        lla_point_shifty = utm2lla.transform(*utm_point_shifty)
+        y_spacing = lla_point_shifty[1] - lla_point[1]
 
         points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
         geos = self.rowcol2geo(points, self.scp_hae)
-
         points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
-        minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
-        miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
+
+        if bbox:
+            minx, maxx = bbox[0], bbox[2]
+            miny, maxy = bbox[1], bbox[3]
+        else:
+            minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
+            miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
 
         width = (maxx - minx) // x_spacing
         length = (maxy - miny) // np.abs(y_spacing)
