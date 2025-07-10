@@ -63,7 +63,7 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-def run_multirtc(platform: str, granule: str, resolution: int, bbox: list, work_dir: Path) -> None:
+def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, work_dir: Path) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:

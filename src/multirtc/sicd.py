@@ -229,7 +229,10 @@ class SicdRzdSlc(Slc, SicdSlc):
         return radar_grid
 
     def create_geogrid(self, spacing_meters: int, bbox: list = None) -> isce3.product.GeoGridParameters:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(bbox, spacing_meters, self.local_epsg)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
 
     def _print_wkt(self):
         return print_wkt(self)
@@ -363,7 +366,7 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-    def create_geogrid(self, spacing_meters: int, bbox: list = None) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: float, bbox: list = None) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
