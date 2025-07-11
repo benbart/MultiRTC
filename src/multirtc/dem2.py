@@ -176,11 +176,11 @@ def padding_dem(input_dem:str, output_dem:str, pad_pixels:list):
     src_width = src.meta['width']
     src_transform = src.meta['transform']
     padded_height = src_height + pad_top + pad_bottom
-    padded_width = src_width + pad_left +pad_right
+    padded_width = src_width + pad_left + pad_right
 
     padded_transform = Affine(
-        src_transform.a, src_transform.b, src_transform.c - (pad_left * src_transform.a),
-        src_transform.d, src_transform.e, src_transform.f - (pad_top * src_transform.e)
+        src_transform.a, src_transform.b, src_transform.c - pad_left * src_transform.a,
+        src_transform.d, src_transform.e, src_transform.f + abs(pad_top * src_transform.e)
     )
 
     profile = src.profile
@@ -213,7 +213,9 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
     src = rasterio.open(input_dem)
     src_epsg = src.profile['crs'].to_epsg()
     gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
+
     poly = gdf_src.iloc[0]
+    poly = box(*poly.bounds)
 
     transform = src.profile['transform']
     poly_src = box(*src.bounds)
@@ -221,10 +223,10 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
     src_bounds = poly_src.bounds
     comb_bounds = poly_comb.bounds
 
-    pad_left = 5 + int((src_bounds[0] - comb_bounds[0])/transform.a)
-    pad_right = 5 + int((comb_bounds[2] - src_bounds[2])/transform.a)
-    pad_top = 5 + int((comb_bounds[1] - src_bounds[1])/transform.e)
-    pad_bottom = 5 + int((src_bounds[3] - comb_bounds[3])/transform.e)
+    pad_left = int((src_bounds[0] - comb_bounds[0])/transform.a) + 5
+    pad_right = int((comb_bounds[2] - src_bounds[2])/transform.a) + 5
+    pad_bottom = int((src_bounds[1] - comb_bounds[1])/abs(transform.e)) + 5
+    pad_top = int((comb_bounds[3] - src_bounds[3])/abs(transform.e)) + 5
 
     padding_dem(input_dem, output_dem, [pad_left, pad_right, pad_top, pad_bottom])
 
