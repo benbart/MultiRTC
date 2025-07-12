@@ -230,4 +230,7 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
 
     padding_dem(input_dem, output_dem, [pad_left, pad_right, pad_top, pad_bottom])
 
-
+def extend_dem_to_bounds_of_reffile(input_dem: str, ref_file: str, output_dem: str):
+    ds = rasterio.open(ref_file)
+    poly = box(*ds.bounds)
+    extend_dem_to_polygon(input_dem, poly, output_dem)
