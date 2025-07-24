@@ -23,6 +23,12 @@ dependencies:
   - geojson
   - geopandas
   - rasterio
+  # For multimetric
+  - matplotlib
+  - pandas
+  - lmfit
+  - scipy
+  - scikit-image
   # For packaging, and testing
   - setuptools
   - setuptools_scm
