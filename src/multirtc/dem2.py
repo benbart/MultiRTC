@@ -1,3 +1,4 @@
+import os
 from collections.abc import Generator
 from pathlib import Path
 import shutil
@@ -374,31 +375,30 @@ def coregister(infile, reffile, outfile):
     bbox_buff = [xmin-buff*gt_ref[1], ymin+buff*gt_ref[5], xmax+buff*gt_ref[1], ymax-buff*gt_ref[5]]
     poly_buff = box(*bbox_buff)
 
-    # clip
-    options = gdal.WarpOptions(
-        srcSRS=src_proj,
-        dstSRS=ref_proj,
-        format='GTiff',
-        cutlineWKT=poly_buff.wkt,
-        cutlineSRS=ref_proj,
-        cropToCutline=True
-    )
-    gdal.Warp('/tmp/tmp1.tif', infile, options=options)
+    with TemporaryDirectory() as temp_dir:
+        # clip
+        options = gdal.WarpOptions(
+            srcSRS=src_proj,
+            dstSRS=ref_proj,
+            format='GTiff',
+            cutlineWKT=poly_buff.wkt,
+            cutlineSRS=ref_proj,
+            cropToCutline=True
+        )
 
+        gdal.Warp(f'{temp_dir}/tmp1.tif', infile, options=options)
 
-    #
-
-    # resample
-    options = gdal.WarpOptions(
-        format='GTiff',
-        srcSRS=ref_proj,
-        dstSRS=ref_proj,
-        xRes=gt_ref[1],
-        yRes=-gt_ref[5],
-        resampleAlg=gdal.GRA_Bilinear,
-        targetAlignedPixels=False
-    )
-    gdal.Warp(outfile, '/tmp/tmp1.tif', options=options)
+        # resample
+        options = gdal.WarpOptions(
+            format='GTiff',
+            srcSRS=ref_proj,
+            dstSRS=ref_proj,
+            xRes=gt_ref[1],
+            yRes=-gt_ref[5],
+            resampleAlg=gdal.GRA_Bilinear,
+            targetAlignedPixels=False
+        )
+        gdal.Warp(outfile, f'{temp_dir}/tmp1.tif', options=options)
 
 def geo_to_pixel(geotransform, x_geo, y_geo):
     """
@@ -411,33 +411,22 @@ def geo_to_pixel(geotransform, x_geo, y_geo):
     return int(col), int(row)
 
 def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
-
     coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
-
-    out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
-
     coregister(other_dem, lidar_dem, coregfile)
 
+    out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
     ds = gdal.Open(lidar_dem)
-
     gt = ds.GetGeoTransform()
-
     band = ds.GetRasterBand(1)
-
+    nodata = band.GetNoDataValue()
     data = band.ReadAsArray()
-
     mask = band.GetMaskBand().ReadAsArray()
-
     xsize, ysize = ds.RasterXSize, ds.RasterYSize
 
     ds_coreg = gdal.Open(coregfile)
-
     gt_coreg = ds_coreg.GetGeoTransform()
-
     col, row = geo_to_pixel(gt_coreg, gt[0], gt[3])
-
     data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()[row:ysize+row, col:xsize+col]
-
     data[mask==0] = data_coreg[mask==0]
 
     # write to a new file out_dem
@@ -446,9 +435,8 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
     ds_out.SetGeoTransform(ds.GetGeoTransform())  ##sets same geotransform as input
     ds_out.SetProjection(ds.GetProjection())  ##sets same projection as input
     ds_out.GetRasterBand(1).WriteArray(data)
-
-    # vv = np.array([None],dtype=data.dtype)[0]
-    # ds.GetRasterBand(1).SetNoDataValue(vv)
+    # nodata = np.array([None],dtype=data.dtype)[0]
+    ds_out.GetRasterBand(1).SetNoDataValue(nodata)
 
     # ds_out.FlushCache()
     ds_out = None
@@ -483,24 +471,24 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
 def download_lidar_dem_for_footprint(dem_path: Path):
 
     lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
-
+    dem_path = Path(dem_path)
     input_path = dem_path.parent
-
     lidar_dem = input_path.joinpath(Path(lidar_dem_orig).name)
-
     shutil.copy(lidar_dem_orig, lidar_dem)
 
     ds = rasterio.open(lidar_dem)
     src_epsg = ds.profile['crs'].to_epsg()
     poly = box(*ds.bounds)
     poly84 = convet_coord_of_polygon(poly, f'EPSG:{src_epsg}', 'EPSG:4326')
-
     poly84 = box(*poly84.bounds)
-
-    dem_30m = '/tmp/dem_30m.tif'
-    dem.download_opera_dem_for_footprint(Path(dem_30m), poly84)
     ds = None
-    dem_out = fill_lidar_dem_with_other_dem(lidar_dem, dem_30m)
+
+    tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
+    if Path(tmp_dem_30m).exists():
+        os.remove(tmp_dem_30m)
+    dem.download_opera_dem_for_footprint(Path(tmp_dem_30m), poly84)
+
+    dem_out = fill_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m)
 
     # resample dem_out to 3m
     ds_dem_out = gdal.Open(dem_out)

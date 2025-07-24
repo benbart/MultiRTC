@@ -63,7 +63,7 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem: str, work_dir: Path) -> None:
+def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -78,10 +78,10 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
 
-    if dem == 'Copernicus 30m':
+    if demtype == 'Copernicus 30m':
         dem_path = input_dir / 'dem_30d0.tif'
         dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
-    elif dem == 'Geodata 3m':
+    elif demtype == 'Geodata 3m':
         dem_path = input_dir / 'dem_3d0.tif'
         dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
     else:
@@ -113,7 +113,7 @@ def main():
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument('--subset', nargs="*", type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)')
-    parser.add_argument('--dem', choices=['Copernicus 30m','Geodata 3m','Lidar 0.5m'],
+    parser.add_argument('--demtype', choices=['Copernicus 30m','Geodata 3m','Lidar 0.5m'],
                         default='Copernicus 30m', help='Choose the DEM type, default is Copernicus 30m')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
 
@@ -122,7 +122,7 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.dem, args.work_dir)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir)
 
 
 if __name__ == '__main__':
