@@ -1,8 +1,10 @@
 from collections.abc import Generator
 from pathlib import Path
+import shutil
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from osgeo import gdal, ogr, osr
+from osgeo.gdalconst import GA_Update
 import numpy as np
 from hyp3lib import DemError
 from hyp3lib.util import GDALConfigManager
@@ -230,7 +232,290 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
 
     padding_dem(input_dem, output_dem, [pad_left, pad_right, pad_top, pad_bottom])
 
+
 def extend_dem_to_bounds_of_reffile(input_dem: str, ref_file: str, output_dem: str):
     ds = rasterio.open(ref_file)
     poly = box(*ds.bounds)
     extend_dem_to_polygon(input_dem, poly, output_dem)
+
+def convet_coord_of_polygon(polygon, src_epsg, dst_epsg):
+    '''convert coords of the polygon from src_epsg to dst_epsg
+    src_epsg and dst_epsg is in the format 'EPSG:xxxxx', for example 'EPSG:32606' , 'EPSG:4326'
+    '''
+    gdf_src = gpd.GeoSeries([polygon], crs=src_epsg)
+    gdf_dst = gdf_src.to_crs(dst_epsg)
+    return gdf_dst.iloc[0]
+
+
+def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, poly: shapely.geometry.Polygon = None):
+    """Clip the raster by polygon
+    Arguments:
+        poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
+    """
+    if poly:
+        gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+        src = rasterio.open(input_raster)
+        src_epsg = src.profile['crs'].to_epsg()
+        gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
+
+        poly = gdf_src.iloc[0]
+        poly = box(*poly.bounds)
+        bounds = poly.bounds
+        clip_extent = (bounds[0]-50, bounds[3]+50, bounds[2]+50, bounds[1]-50)
+        # clip_extent (upper_left_x, upper_left_y, lower_right_x, lower_right_y)
+        gdal.Translate(output_raster, input_raster, projWin=clip_extent, bandList=[bandnum])
+    else:
+        gdal.Translate(output_raster, input_raster, bandList=[bandnum])
+
+
+def set_nodata(infile, nodata:float = 0.0):
+    # open the file for editing
+    ras = gdal.Open(infile, GA_Update)
+    # loop through the image bands
+    for i in range(1, ras.RasterCount + 1):
+        # set the nodata value of the band
+        ras.GetRasterBand(i).SetNoDataValue(nodata)
+    # unlink the file object and save the results
+    ras = None
+
+
+def convert_nan_to_nodata(infile, nodata: float = 0.0):
+    # open the file for editing
+    ras = gdal.Open(infile, GA_Update)
+    # loop through the image bands
+    for i in range(1, ras.RasterCount + 1):
+        band = ras.GetRasterBand(i)
+        data = band.ReadAsArray()
+        nanmsk = np.isnan(data)
+        data[nanmsk] = nodata
+        # set the nodata value of the band
+        ras.GetRasterBand(i).WriteArray(data)
+        ras.GetRasterBand(i).SetNoDataValue(nodata)
+    # unlink the file object and save the results
+    ras = None
+
+
+def fill_nodata(infile):
+    # Open the raster in update mode
+    ds = gdal.Open(infile, gdal.GA_Update)
+    # Get the first band
+    band = ds.GetRasterBand(1)
+
+    # Get the NoData value
+    no_data_value = band.GetNoDataValue()
+    if no_data_value is None:
+        ds = None
+    else:
+        # Define parameters for filling
+        max_distance = 10  # Max distance to search for valid pixels
+        smoothing_iterations = 3  # No smoothing in this example
+
+        # Fill NoData values
+        # Pass None for the mask_band if no mask is used
+        gdal.FillNodata(band, None, max_distance, smoothing_iterations)
+        # Close the dataset to save changes
+        ds = None
+
+
+def polygonize(input_raster_path, output_geojson_path):
+    src_ds = gdal.Open(input_raster_path)
+    if src_ds is None:
+        print(f"Could not open {input_raster_path}")
+        exit()
+
+    srcband = src_ds.GetRasterBand(1) # Use the first band, adjust as needed
+
+    drv = ogr.GetDriverByName("GeoJSON")
+
+    # Delete the output file if it already exists (optional, but good for testing)
+    if drv.Open(output_geojson_path, 0):
+        drv.DeleteDataSource(output_geojson_path)
+
+    dst_ds = drv.CreateDataSource(output_geojson_path)
+    if dst_ds is None:
+        print(f"Could not create GeoJSON data source at {output_geojson_path}")
+        exit()
+
+    # Get the spatial reference from the input raster (optional, but recommended)
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(src_ds.GetProjectionRef())
+
+    dst_layer_name = "polygonized_features"
+    dst_layer = dst_ds.CreateLayer(dst_layer_name, srs=srs, geom_type=ogr.wkbPolygon)
+
+    field_name = "DN" # Digital Number
+    field_defn = ogr.FieldDefn(field_name, ogr.OFTInteger)
+    dst_layer.CreateField(field_defn)
+
+    gdal.Polygonize(srcband, None, dst_layer, 0, [], callback=None)
+
+    src_ds = None
+    dst_ds = None
+
+
+def coregister(infile, reffile, outfile):
+    src_ds = gdal.Open(infile)
+    ref_ds = gdal.Open(reffile)
+    src_proj = src_ds.GetProjectionRef()
+    ref_proj = ref_ds.GetProjectionRef()
+    x_size, y_size = ref_ds.RasterXSize, ref_ds.RasterYSize
+    nodata = ref_ds.GetRasterBand(1).GetNoDataValue()
+    gt_src = src_ds.GetGeoTransform()
+    gt_ref = ref_ds.GetGeoTransform()
+    xmin = min(gt_ref[0], gt_ref[0] + x_size * gt_ref[1])
+    xmax = max(gt_ref[0], gt_ref[0] + x_size * gt_ref[1])
+    ymin = min(gt_ref[3], gt_ref[3] + y_size * gt_ref[5])
+    ymax = max(gt_ref[3], gt_ref[3] + y_size * gt_ref[5])
+
+    bbox = [xmin, ymin, xmax, ymax]
+    poly = box(*bbox)
+
+    buff = 120.0
+    bbox_buff = [xmin-buff*gt_ref[1], ymin+buff*gt_ref[5], xmax+buff*gt_ref[1], ymax-buff*gt_ref[5]]
+    poly_buff = box(*bbox_buff)
+
+    # clip
+    options = gdal.WarpOptions(
+        srcSRS=src_proj,
+        dstSRS=ref_proj,
+        format='GTiff',
+        cutlineWKT=poly_buff.wkt,
+        cutlineSRS=ref_proj,
+        cropToCutline=True
+    )
+    gdal.Warp('/tmp/tmp1.tif', infile, options=options)
+
+
+    #
+
+    # resample
+    options = gdal.WarpOptions(
+        format='GTiff',
+        srcSRS=ref_proj,
+        dstSRS=ref_proj,
+        xRes=gt_ref[1],
+        yRes=-gt_ref[5],
+        resampleAlg=gdal.GRA_Bilinear,
+        targetAlignedPixels=False
+    )
+    gdal.Warp(outfile, '/tmp/tmp1.tif', options=options)
+
+def geo_to_pixel(geotransform, x_geo, y_geo):
+    """
+    Converts geographic coordinates (x_geo, y_geo) to pixel coordinates (col, row)
+    using a GDAL geotransform.
+    """
+    gt0, gt1, gt2, gt3, gt4, gt5 = geotransform
+    col = (x_geo - gt0) / gt1
+    row = (y_geo - gt3) / gt5
+    return int(col), int(row)
+
+def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
+
+    coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
+
+    out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
+
+    coregister(other_dem, lidar_dem, coregfile)
+
+    ds = gdal.Open(lidar_dem)
+
+    gt = ds.GetGeoTransform()
+
+    band = ds.GetRasterBand(1)
+
+    data = band.ReadAsArray()
+
+    mask = band.GetMaskBand().ReadAsArray()
+
+    xsize, ysize = ds.RasterXSize, ds.RasterYSize
+
+    ds_coreg = gdal.Open(coregfile)
+
+    gt_coreg = ds_coreg.GetGeoTransform()
+
+    col, row = geo_to_pixel(gt_coreg, gt[0], gt[3])
+
+    data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()[row:ysize+row, col:xsize+col]
+
+    data[mask==0] = data_coreg[mask==0]
+
+    # write to a new file out_dem
+    driver = gdal.GetDriverByName("GTiff")
+    ds_out = driver.Create(out_dem, xsize, ysize, 1, gdal.GDT_Float32)
+    ds_out.SetGeoTransform(ds.GetGeoTransform())  ##sets same geotransform as input
+    ds_out.SetProjection(ds.GetProjection())  ##sets same projection as input
+    ds_out.GetRasterBand(1).WriteArray(data)
+
+    # vv = np.array([None],dtype=data.dtype)[0]
+    # ds.GetRasterBand(1).SetNoDataValue(vv)
+
+    # ds_out.FlushCache()
+    ds_out = None
+    ds = None
+    ds_coreg = None
+
+    return out_dem
+
+def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
+    """clip lidar dem file with bbox [minlon, minlat, maxlon,maxlat]
+
+    Args:
+        infile: lidar dem file
+        bbox: [minlon, minlat, maxlon,maxlat] in WGS84
+
+    Returns:
+        outfile: output dem file in WGS84
+
+    """
+    if bbox:
+        poly = box(*bbox)
+    else:
+        poly = None
+
+    clip_raster_by_poly(infile, outfile, bandnum=bandnum, poly=poly)
+    reproject_to_4326(Path(outfile))
+    set_nodata(outfile, nodata=0.0)
+    convert_to_height_above_ellipsoid(Path(outfile))
+
+
+
+def download_lidar_dem_for_footprint(dem_path: Path):
+
+    lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
+
+    input_path = dem_path.parent
+
+    lidar_dem = input_path.joinpath(Path(lidar_dem_orig).name)
+
+    shutil.copy(lidar_dem_orig, lidar_dem)
+
+    ds = rasterio.open(lidar_dem)
+    src_epsg = ds.profile['crs'].to_epsg()
+    poly = box(*ds.bounds)
+    poly84 = convet_coord_of_polygon(poly, f'EPSG:{src_epsg}', 'EPSG:4326')
+
+    poly84 = box(*poly84.bounds)
+
+    dem_30m = '/tmp/dem_30m.tif'
+    dem.download_opera_dem_for_footprint(Path(dem_30m), poly84)
+    ds = None
+    dem_out = fill_lidar_dem_with_other_dem(lidar_dem, dem_30m)
+
+    # resample dem_out to 3m
+    ds_dem_out = gdal.Open(dem_out)
+    proj_dem_out = ds_dem_out.GetProjectionRef()
+    options = gdal.WarpOptions(
+        format='GTiff',
+        srcSRS=proj_dem_out,
+        dstSRS=proj_dem_out,
+        xRes=3.0,
+        yRes=3.0,
+        resampleAlg=gdal.GRA_Bilinear,
+        targetAlignedPixels=False
+    )
+    gdal.Warp(dem_path, dem_out, options=options)
+
+    # convert to wgs84 and elps96 based height
+    reproject_to_4326(dem_path)
+    convert_to_height_above_ellipsoid(dem_path)

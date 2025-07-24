@@ -63,21 +63,30 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, work_dir: Path) -> None:
+def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem: str, work_dir: Path) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
+        dem:
         platform: Platform type (e.g., 'UMBRA').
         granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
         resolution: Resolution of the output RTC (in meters).
         bbox: [min_lon, min_lat, max_lon, max_lat], used to clip the raster. default=None
+        dem: dem type, one of ['Copernicus 30m','Geodata 3m','Lidar 0.5m']
         work_dir: Working directory for processing.
     """
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
-    dem_path = input_dir / 'dem.tif'
-    # dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
-    dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
+
+    if dem == 'Copernicus 30m':
+        dem_path = input_dir / 'dem_30d0.tif'
+        dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
+    elif dem == 'Geodata 3m':
+        dem_path = input_dir / 'dem_3d0.tif'
+        dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
+    else:
+        dem_path = input_dir / 'dem_0d5.tif'
+        dem2.download_lidar_dem_for_footprint(dem_path)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, bbox=bbox)
     if slc.supports_rtc:
@@ -104,6 +113,8 @@ def main():
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument('--subset', nargs="*", type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)')
+    parser.add_argument('--dem', choices=['Copernicus 30m','Geodata 3m','Lidar 0.5m'],
+                        default='Copernicus 30m', help='Choose the DEM type, default is Copernicus 30m')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
 
     args = parser.parse_args()
@@ -111,7 +122,7 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.dem, args.work_dir)
 
 
 if __name__ == '__main__':

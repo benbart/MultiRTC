@@ -1,7 +1,8 @@
 import isce3
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 import pyproj
+import geopandas as gpd
 
 def get_point_epsg(lat: float, lon: float) -> int:
     """Determine the best EPSG code for a given latitude and longitude.
@@ -130,7 +131,7 @@ def generate_geogrids(slc, spacing_meters: float, epsg: int) -> isce3.product.Ge
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
     return geogrid_snapped
 
-def bbox84_to_bboxlocal(bbox, dst_epsg: int):
+def bbox84_to_bboxlocal_old(bbox, dst_epsg: int):
     """ Convert bbox in wgs84 to bbox in dst_epsg
 
     Args:
@@ -157,6 +158,14 @@ def bbox84_to_bboxlocal(bbox, dst_epsg: int):
     miny, maxy = np.min(points_local[:, 1]), np.max(points_local[:, 1])
 
     return [minx, miny, maxx, maxy]
+
+def bbox84_to_bboxlocal(bbox, dst_epsg: int):
+    poly = box(*bbox)
+    gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+    gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
+    poly = gdf_src.iloc[0]
+    poly = box(*poly.bounds)
+    return poly.bounds
 
 def generate_geogrids_via_bbox(bbox: list, spacing_meters: float, epsg: int) -> isce3.product.GeoGridParameters:
     """Computer a geogrid based on bbox, spacing_meters, and epsg

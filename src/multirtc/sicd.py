@@ -228,7 +228,7 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    def create_geogrid(self, spacing_meters: int, bbox: list = None) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: float, bbox: list = None) -> isce3.product.GeoGridParameters:
         if bbox:
             return define_geogrid.generate_geogrids_via_bbox(bbox, spacing_meters, self.local_epsg)
         else:
