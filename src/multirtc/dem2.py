@@ -572,4 +572,5 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
     tmpfile = output_path.rename(output_path.parent / 'tmpfile.tif')
     clip_raster_by_poly(str(tmpfile), str(output_path), poly = box(*bbox))
     reproject_to_4326(output_path)
-    convert_to_height_above_ellipsoid(output_path)
+    # ArcticDEM vertical is based on WGS84 Ellipsoid, so no need to convert to ellipsoid based height
+    # convert_to_height_above_ellipsoid(output_path)
