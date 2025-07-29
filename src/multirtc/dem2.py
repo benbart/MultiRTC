@@ -40,7 +40,7 @@ def reproject_to_4326(in_raster: Path):
         warp = gdal.Warp(in_raster, tmp_raster, dstSRS='EPSG:4326', resampleAlg='cubic')
         warp = None  # Closes the files
 
-def convert_to_height_above_ellipsoid(dem_file: Path) -> None:
+def convert_to_ellipsoid_based_height(dem_file: Path) -> None:
     dem_info = gdal.Info(str(dem_file), format='json')
     minx = dem_info['cornerCoordinates']['lowerLeft'][0]
     miny = dem_info['cornerCoordinates']['lowerLeft'][1]
@@ -148,7 +148,7 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
 
 
     reproject_to_4326(output_path)
-    convert_to_height_above_ellipsoid(output_path)
+    convert_to_ellipsoid_based_height(output_path)
 
 
 def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
@@ -468,7 +468,7 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     clip_raster_by_poly(infile, outfile, bandnum=bandnum, poly=poly)
     reproject_to_4326(Path(outfile))
     set_nodata(outfile, nodata=0.0)
-    convert_to_height_above_ellipsoid(Path(outfile))
+    convert_to_ellipsoid_based_height(Path(outfile))
 
 
 
@@ -510,12 +510,12 @@ def download_lidar_dem_for_footprint(dem_path: Path):
 
     # convert to wgs84 and elps96 based height
     reproject_to_4326(dem_path)
-    convert_to_height_above_ellipsoid(dem_path)
+    convert_to_ellipsoid_based_height(dem_path)
 
 
 def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.0):
     """
-       Download the Arctic DEM DEM for a given footprint and save it to the specified output path.
+       Download the Arctic DEM for a given footprint and save it to the specified output path.
 
        Args:
            output_path: Path where the DEM will be saved.
@@ -573,4 +573,4 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
     clip_raster_by_poly(str(tmpfile), str(output_path), poly = box(*bbox))
     reproject_to_4326(output_path)
     # ArcticDEM vertical is based on WGS84 Ellipsoid, so no need to convert to ellipsoid based height
-    # convert_to_height_above_ellipsoid(output_path)
+    # convert_to_ellipsoid_based_height(output_path)
