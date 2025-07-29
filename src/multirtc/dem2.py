@@ -3,6 +3,9 @@ from collections.abc import Generator
 from pathlib import Path
 import shutil
 from tempfile import NamedTemporaryFile, TemporaryDirectory
+import boto3
+from botocore.config import Config
+import subprocess
 
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_Update
@@ -18,6 +21,7 @@ import rasterio
 from rasterio.transform import Affine
 from rasterio.mask import mask
 from shapely.geometry import LinearRing, Polygon, box
+import pystac_client
 
 from multirtc import dem
 
@@ -507,3 +511,65 @@ def download_lidar_dem_for_footprint(dem_path: Path):
     # convert to wgs84 and elps96 based height
     reproject_to_4326(dem_path)
     convert_to_height_above_ellipsoid(dem_path)
+
+
+def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.0):
+    """
+       Download the Arctic DEM DEM for a given footprint and save it to the specified output path.
+
+       Args:
+           output_path: Path where the DEM will be saved.
+           footprint: Polygon representing the area of interest.
+           buffer: Buffer distance in degrees to extend the footprint.
+       """
+
+    # if output_path.exists():
+    #    exit(0)
+    footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
+    footprint = shapely.geometry.box(*footprint.bounds)
+    footprints = dem.check_antimeridean(footprint)
+    footprints = shapely.geometry.MultiPolygon(footprints)
+    bbox = footprints.bounds
+    cat = pystac_client.Client.open("https://stac.pgc.umn.edu/api/v1/")
+    # get the arcticdem-mosaics-v4.1-2m collection
+    # collection = cat.get_collection("arcticdem-mosaics-v4.1-2m")
+    # build the API query for the items within out bounding box and date range
+    search = cat.search(
+    collections = ["arcticdem-mosaics-v4.1-2m"],
+    bbox=bbox
+    )
+
+    # download the files defined in the items
+    output_dir = output_path.parent
+    input_files=[]
+    for item in search.items():
+        s3_object_key = Path(item.assets['dem'].href.split(".com")[1])
+        local_file_path = output_dir / s3_object_key.name
+
+        try:
+            subprocess.run(["wget", "-P", str(output_dir), item.assets['dem'].href], check=True)
+            input_files.append(local_file_path)
+            print(f"File '{s3_object_key}' downloaded to '{local_file_path}' successfully.")
+        except Exception as e:
+            print(f"Error downloading file: {e}")
+            exit(1)
+    if not input_files:
+        print("No dem file is available for downloading")
+        exit(1)
+
+    if len(input_files) == 1:
+        input_files[0].rename(output_path)
+    else:
+        # combine multiple tif files
+        vrt_filepath = output_dir / 'dem.vrt'
+        gdal.BuildVRT(str(vrt_filepath), input_files)
+        ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
+        gdal.Translate(str(output_path), ds, format='GTiff')
+        ds = None
+        [Path(f).unlink() for f in input_files + [vrt_filepath]]
+
+    # clip, convert to wgs84, and convert to ellipsoid 96 based DEM
+    tmpfile = output_path.rename(output_path.parent / 'tmpfile.tif')
+    clip_raster_by_poly(str(tmpfile), str(output_path), poly = box(*bbox))
+    reproject_to_4326(output_path)
+    convert_to_height_above_ellipsoid(output_path)

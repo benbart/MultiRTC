@@ -5,6 +5,7 @@ import argparse
 import sys
 sys.path.remove(sys.path[0])
 
+from shapely.geometry import Polygon, box
 from pathlib import Path
 
 from burst2safe.burst2safe import burst2safe
@@ -80,12 +81,20 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
 
+    if bbox:
+        poly = box(*bbox)
+    else:
+        poly = slc.footprint
+
     if demtype == 'Copernicus 30m':
         dem_path = input_dir / 'dem_30d0.tif'
-        dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
+        dem.download_opera_dem_for_footprint(dem_path, poly)
     elif demtype == 'Geodata 3m':
         dem_path = input_dir / 'dem_3d0.tif'
-        dem2.download_geodata_cooperative_dem_for_footprint(dem_path, slc.footprint)
+        dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly)
+    elif demtype == 'ArcticDEM 2m':
+        dem_path = input_dir / 'dem_2d0.tif'
+        dem2.download_2m_arcticdem(dem_path, poly)
     else:
         dem_path = input_dir / 'dem_0d5.tif'
         dem2.download_lidar_dem_for_footprint(dem_path)
@@ -129,7 +138,7 @@ def main():
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument('--subset', nargs="*", type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)')
-    parser.add_argument('--demtype', choices=['Copernicus 30m','Geodata 3m','Lidar 0.5m'],
+    parser.add_argument('--demtype', choices=['Copernicus 30m','Geodata 3m','ArcticDEM 2m', 'Lidar 0.5m'],
                         default='Copernicus 30m', help='Choose the DEM type, default is Copernicus 30m')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
 

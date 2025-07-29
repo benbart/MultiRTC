@@ -23,6 +23,7 @@ dependencies:
   - geojson
   - geopandas
   - rasterio
+  - pystac-client
   # For multimetric
   - matplotlib
   - pandas

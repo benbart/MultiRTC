@@ -41,6 +41,7 @@ dependencies = [
     "lmfit",
     "scipy",
     "scikit-image",
+    "pystac-client",
 ]
 dynamic = ["version", "readme"]
 
