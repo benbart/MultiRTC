@@ -148,7 +148,8 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
 
 
     reproject_to_4326(output_path)
-    convert_to_ellipsoid_based_height(output_path)
+    # GEODATA 3m DEM is based on ellipsoid (EGM96), no need to do the conversion
+    # convert_to_ellipsoid_based_height(output_path)
 
 
 def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
@@ -508,9 +509,10 @@ def download_lidar_dem_for_footprint(dem_path: Path):
     )
     gdal.Warp(dem_path, dem_out, options=options)
 
-    # convert to wgs84 and elps96 based height
+    # convert to wgs84
     reproject_to_4326(dem_path)
-    convert_to_ellipsoid_based_height(dem_path)
+    # since majority Lidar height data is based on ellipsoid, no need to do conversion
+    # convert_to_ellipsoid_based_height(dem_path)
 
 
 def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.0):
