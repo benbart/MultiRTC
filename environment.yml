@@ -19,6 +19,11 @@ dependencies:
   - burst2safe
   - tqdm
   - hyp3lib
+  - dask
+  - geojson
+  - geopandas
+  - rasterio
+  - pystac-client
   # For multimetric
   - matplotlib
   - pandas

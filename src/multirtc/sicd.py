@@ -3,6 +3,7 @@ from pathlib import Path
 
 import isce3
 import numpy as np
+import dask.array as da
 import pyproj
 from numpy.polynomial.polynomial import polyval2d
 from osgeo import gdal
@@ -88,6 +89,13 @@ class SicdSlc:
         ycol = icol * self.spacing[1]
         return xrow, ycol
 
+    def dask_polyval2d(self, xrow, ycol, coeff, chunks=(100,100)):
+        xrow = da.from_array(xrow.astype(np.float32), chunks=chunks)
+        ycol = da.from_array(ycol.astype(np.float32), chunks=chunks)
+        result = da.map_blocks(polyval2d, xrow, ycol, coeff.astype(np.float32), dtype=xrow.dtype)
+        scale_factor = result.compute()
+        return scale_factor
+
     def load_data(self, rowrange: tuple | None = None, colrange: tuple | None = None):
         if colrange is not None and rowrange is not None:
             data = self.reader[rowrange[0] : rowrange[1], colrange[0] : colrange[1]]
@@ -120,15 +128,25 @@ class SicdSlc:
 
         data = self.load_data(rowrange=rowrange, colrange=colrange)
         xrow, ycol = self.get_xrow_ycol(rowrange=rowrange, colrange=colrange)
-        scale_factor = polyval2d(xrow, ycol, coeff)
+
+        scale_factor = self.dask_polyval2d(xrow, ycol, coeff)
+
         del xrow, ycol  # deleting for memory management
+
+        if colrange is not None and rowrange is not None:
+            data = da.from_array(self.reader[rowrange[0] : rowrange[1], colrange[0] : colrange[1]], chunks=[100,100])
+        elif colrange is None and rowrange is None:
+            data = da.from_array(self.reader[:, :], chunks=[100,100])
+        else:
+            raise ValueError('Both xrange and yrange must be provided or neither.')
 
         if power:
             data = (data.real**2 + data.imag**2) * scale_factor
         else:
             data = data * np.sqrt(scale_factor)
+        
+        return data.compute()
 
-        return data
 
     def create_complex_beta0(self, outpath: str, row_iter: int = 256) -> None:
         """Create a complex beta0 image from the SICD data.
@@ -226,8 +244,11 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+    def create_geogrid(self, spacing_meters: float, bbox: list = None) -> isce3.product.GeoGridParameters:
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(bbox, spacing_meters, self.local_epsg)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
 
     def _print_wkt(self):
         return print_wkt(self)
@@ -296,8 +317,6 @@ class SicdPfaSlc(Slc, SicdSlc):
         """
         polar_ang_poly = self.pfa_vars.PolarAngPoly
         spatial_freq_sf_poly = self.pfa_vars.SpatialFreqSFPoly
-        polar_ang_poly_der = polar_ang_poly.derivative(der_order=1, return_poly=True)
-        spatial_freq_sf_poly_der = spatial_freq_sf_poly.derivative(der_order=1, return_poly=True)
 
         polar_ang_poly_der = polar_ang_poly.derivative(der_order=1, return_poly=True)
         spatial_freq_sf_poly_der = spatial_freq_sf_poly.derivative(der_order=1, return_poly=True)
@@ -363,13 +382,13 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: float, bbox: list = None) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
         Args:
             spacing_meters: Spacing in meters for the geogrid.
-
+            poly: polygon to clip the original geos.
         Returns:
             isce3.product.GeoGridParameters: The generated geogrid parameters.
         """
@@ -382,17 +401,24 @@ class SicdPfaSlc(Slc, SicdSlc):
 
         lla_point = (self.center.x, self.center.y)
         utm_point = lla2utm.transform(*lla_point)
-        utm_point_shift = (utm_point[0] + spacing_meters, utm_point[1])
-        lla_point_shift = utm2lla.transform(*utm_point_shift)
-        x_spacing = lla_point_shift[0] - lla_point[0]
-        y_spacing = -1 * x_spacing
+        utm_point_shiftx = (utm_point[0] + spacing_meters, utm_point[1])
+        lla_point_shiftx = utm2lla.transform(*utm_point_shiftx)
+        x_spacing = lla_point_shiftx[0] - lla_point[0]
+
+        utm_point_shifty = (utm_point[0], utm_point[1] - spacing_meters)
+        lla_point_shifty = utm2lla.transform(*utm_point_shifty)
+        y_spacing = lla_point_shifty[1] - lla_point[1]
 
         points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
         geos = self.rowcol2geo(points, self.scp_hae)
-
         points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
-        minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
-        miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
+
+        if bbox:
+            minx, maxx = bbox[0], bbox[2]
+            miny, maxy = bbox[1], bbox[3]
+        else:
+            minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
+            miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
 
         width = (maxx - minx) // x_spacing
         length = (maxy - miny) // np.abs(y_spacing)

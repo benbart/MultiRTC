@@ -12,7 +12,6 @@ from shapely.geometry import LinearRing, Polygon, box
 gdal.UseExceptions()
 URL = 'https://nisar.asf.earthdatacloud.nasa.gov/STATIC/DEM/v1.1/EPSG4326'
 
-
 def check_antimeridean(poly: Polygon) -> list[Polygon]:
     """Check if the polygon crosses the antimeridian and split the polygon if it does.
 

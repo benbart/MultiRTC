@@ -32,11 +32,16 @@ dependencies = [
     "burst2safe",
     "tqdm",
     "hyp3lib",
+    "dask",
+    "geojson",
+    "geopandas",
+    "rasterio",
     "matplotlib",
     "pandas",
     "lmfit",
     "scipy",
     "scikit-image",
+    "pystac-client",
 ]
 dynamic = ["version", "readme"]
 

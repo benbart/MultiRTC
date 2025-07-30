@@ -13,7 +13,6 @@ and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 * Utilities for assessing absolute/relative location error, and point target characteristics of output products.
-
 ## [0.3.3]
 
 ### Changed
