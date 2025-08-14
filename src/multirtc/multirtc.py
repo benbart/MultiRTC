@@ -97,7 +97,8 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
         dem2.download_2m_arcticdem(dem_path, poly)
     else:
         dem_path = input_dir / 'dem_0d5.tif'
-        dem2.download_lidar_dem_for_footprint(dem_path)
+        lidar_dem_orig = Path("/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_pdal.tif")
+        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, bbox=bbox)
     if slc.supports_rtc:

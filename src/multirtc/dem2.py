@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 import boto3
 from botocore.config import Config
 import subprocess
+from pyproj import CRS
 
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_Update
@@ -473,16 +474,28 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
 
 
 
-def download_lidar_dem_for_footprint(dem_path: Path):
+def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path):
 
-    lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
+    # lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
+
+    # lidar_dem_orig = "/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_pdal.tif"
+
     dem_path = Path(dem_path)
+
+    if dem_path.exists():
+        return dem_path
+
     input_path = dem_path.parent
-    lidar_dem = input_path.joinpath(Path(lidar_dem_orig).name)
+    lidar_dem = input_path.joinpath(Path(lidar_dem_orig).stem + '_tmp.tif')
     shutil.copy(lidar_dem_orig, lidar_dem)
 
     ds = rasterio.open(lidar_dem)
-    src_epsg = ds.profile['crs'].to_epsg()
+    crs = CRS.from_wkt(ds.profile['crs'].to_wkt())
+    if crs.is_compound:
+        src_epsg = crs.to_2d().to_epsg()
+    else:
+        src_epsg = ds.profile['crs'].to_epsg()
+
     poly = box(*ds.bounds)
     poly84 = convet_coord_of_polygon(poly, f'EPSG:{src_epsg}', 'EPSG:4326')
     poly84 = box(*poly84.bounds)
@@ -513,7 +526,7 @@ def download_lidar_dem_for_footprint(dem_path: Path):
     reproject_to_4326(dem_path)
     # since majority Lidar height data is based on ellipsoid, no need to do conversion
     # convert_to_ellipsoid_based_height(dem_path)
-
+    return dem_path
 
 def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.0):
     """
