@@ -1,11 +1,14 @@
 """Create an RTC dataset for a multiple satellite platforms"""
 
+<<<<<<< HEAD
 import argparse
 
 import sys
 sys.path.remove(sys.path[0])
 
 from shapely.geometry import Polygon, box
+=======
+>>>>>>> b1655a870aabd53aacdbcdff354c4b9bcef5c9d7
 from pathlib import Path
 
 from burst2safe.burst2safe import burst2safe
@@ -13,7 +16,7 @@ from s1reader.s1_orbit import retrieve_orbit_file
 
 from multirtc import dem, dem2
 from multirtc.base import Slc
-from multirtc.create_rtc import pfa_prototype_geocode, rtc
+from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
@@ -67,6 +70,7 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path) -> None:
+
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -77,6 +81,7 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
         bbox: [min_lon, min_lat, max_lon, max_lat], used to clip the raster. default=None
         dem: dem type, one of ['Copernicus 30m','Geodata 3m','Lidar 0.5m']
         work_dir: Working directory for processing.
+        apply_rtc: If True perform radiometric correction; if False, only geocode.
     """
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
@@ -104,13 +109,17 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
         opts = RtcOptions(
             dem_path=str(dem_path),
             output_dir=str(output_dir),
+            apply_rtc=apply_rtc,
             resolution=resolution,
             apply_bistatic_delay=slc.supports_bistatic_delay,
             apply_static_tropo=slc.supports_static_tropo,
         )
         rtc(slc, geogrid, opts)
     else:
-        pfa_prototype_geocode(slc, geogrid, dem_path, output_dir)
+        raise NotImplementedError(
+            'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
+            'https://github.com/forrestfwilliams/MultiRTC/pkgs/container/multirtc'
+        )
 
 
 def create_parser(parser):
@@ -124,6 +133,7 @@ def create_parser(parser):
 def run(args):
     if args.work_dir is None:
         args.work_dir = Path.cwd()
+<<<<<<< HEAD
     run_multirtc(args.platform, args.granule, args.resolution, args.work_dir)
 
 
@@ -152,3 +162,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+=======
+    run_multirtc(args.platform, args.granule, args.resolution, args.work_dir, apply_rtc=True)
+>>>>>>> b1655a870aabd53aacdbcdff354c4b9bcef5c9d7
