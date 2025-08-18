@@ -1,14 +1,12 @@
 """Create an RTC dataset for a multiple satellite platforms"""
 
-<<<<<<< HEAD
 import argparse
 
 import sys
 sys.path.remove(sys.path[0])
 
 from shapely.geometry import Polygon, box
-=======
->>>>>>> b1655a870aabd53aacdbcdff354c4b9bcef5c9d7
+
 from pathlib import Path
 
 from burst2safe.burst2safe import burst2safe
