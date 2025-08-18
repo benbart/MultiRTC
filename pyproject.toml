@@ -42,6 +42,7 @@ dependencies = [
     "scipy",
     "scikit-image",
     "pystac-client",
+    "pdal",
 ]
 dynamic = ["version", "readme"]
 

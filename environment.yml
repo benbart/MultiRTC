@@ -30,6 +30,7 @@ dependencies:
   - lmfit
   - scipy
   - scikit-image
+  - pdal
   # For packaging, and testing
   - setuptools
   - setuptools_scm

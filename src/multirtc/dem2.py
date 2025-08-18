@@ -361,6 +361,11 @@ def polygonize(input_raster_path, output_geojson_path):
 
 
 def coregister(infile, reffile, outfile):
+    '''coregister 30m DEM to lidar DEM
+    infile: 30m dem
+    reffile: lidar dem
+    outfile: coregistered file
+    '''
     src_ds = gdal.Open(infile)
     ref_ds = gdal.Open(reffile)
     src_proj = src_ds.GetProjectionRef()
@@ -473,6 +478,21 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     convert_to_ellipsoid_based_height(Path(outfile))
 
 
+def resample_to_3m(dem_in, dem_out):
+    # resample dem_out to 3m
+    ds_dem_in = gdal.Open(dem_in)
+    proj_dem_in = ds_dem_in.GetProjectionRef()
+    options = gdal.WarpOptions(
+        format='GTiff',
+        srcSRS=proj_dem_in,
+        dstSRS=proj_dem_in,
+        xRes=3.0,
+        yRes=3.0,
+        resampleAlg=gdal.GRA_Bilinear,
+        targetAlignedPixels=False
+    )
+    gdal.Warp(dem_out, dem_in, options=options)
+
 
 def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path):
 
@@ -506,22 +526,12 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path):
         os.remove(tmp_dem_30m)
     dem.download_opera_dem_for_footprint(Path(tmp_dem_30m), poly84)
 
-    dem_out = fill_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m)
+    dem_filled = fill_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m)
 
-    # resample dem_out to 3m
-    ds_dem_out = gdal.Open(dem_out)
-    proj_dem_out = ds_dem_out.GetProjectionRef()
-    options = gdal.WarpOptions(
-        format='GTiff',
-        srcSRS=proj_dem_out,
-        dstSRS=proj_dem_out,
-        xRes=3.0,
-        yRes=3.0,
-        resampleAlg=gdal.GRA_Bilinear,
-        targetAlignedPixels=False
-    )
-    gdal.Warp(dem_path, dem_out, options=options)
-
+    # resample to 3m
+    # resample_to_3m(dem_filled, dem_path)
+    # os.rename(dem_filled, dem_path)
+    shutil.copy(dem_filled, dem_path)
     # convert to wgs84
     reproject_to_4326(dem_path)
     # since majority Lidar height data is based on ellipsoid, no need to do conversion
