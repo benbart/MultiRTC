@@ -134,8 +134,7 @@ def create_parser(parser):
 def run(args):
     if args.work_dir is None:
         args.work_dir = Path.cwd()
-<<<<<<< HEAD
-    run_multirtc(args.platform, args.granule, args.resolution, args.work_dir)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir)
 
 
 def main():
@@ -163,6 +162,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-=======
-    run_multirtc(args.platform, args.granule, args.resolution, args.work_dir, apply_rtc=True)
->>>>>>> b1655a870aabd53aacdbcdff354c4b9bcef5c9d7
