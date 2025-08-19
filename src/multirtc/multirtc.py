@@ -67,7 +67,7 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path) -> None:
+def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path, apply_rtc: bool=True) -> None:
 
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
@@ -149,13 +149,13 @@ def main():
     parser.add_argument('--demtype', choices=['Copernicus 30m','Geodata 3m','ArcticDEM 2m', 'Lidar 0.5m'],
                         default='Copernicus 30m', help='Choose the DEM type, default is Copernicus 30m')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
-
+    parser.add_argument('--rtc', type=bool, default=True, help='create RTC or geocode only product')
     args = parser.parse_args()
 
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir, args.rtc)
 
 
 if __name__ == '__main__':
