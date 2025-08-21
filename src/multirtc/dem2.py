@@ -154,6 +154,16 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
 
 
 def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
+    '''clip a raster with an polygon defined in the same crs as the input raster
+
+    Args:
+        input_dem: file name of the raster
+        polygon: shapely.geometry.Polygon
+        output_dem: filename of the clipped raster
+
+    Returns:
+
+    '''
     with rasterio.open(input_dem) as src:
         out_image, out_transform = mask(src, [polygon], crop=True)
         out_meta = src.meta.copy()
