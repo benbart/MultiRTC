@@ -20,12 +20,19 @@ dependencies:
   - tqdm
   - requests
   - urllib3
+  - hyp3lib
+  - dask
+  - geojson
+  - geopandas
+  - rasterio
+  - pystac-client
   # For multimetric
   - matplotlib
   - pandas
   - lmfit
   - scipy
   - scikit-image
+  - pdal
   # For packaging, and testing
   - setuptools
   - setuptools_scm

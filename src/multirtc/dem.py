@@ -71,7 +71,6 @@ def validate_dem(dem_path: Path, footprint: Polygon) -> None:
             f'DEM does not fully cover the footprint: ({dem_bound_str}) for DEM, vs ({footprint_bound_str})'
         )
 
-
 def check_antimeridean(poly: Polygon) -> list[Polygon]:
     """Check if the polygon crosses the antimeridian and split the polygon if it does.
 

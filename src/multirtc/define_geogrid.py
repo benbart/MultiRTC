@@ -1,7 +1,11 @@
 import isce3
 import numpy as np
-from shapely.geometry import Polygon
-
+from shapely.geometry import Polygon, box
+import pyproj
+import rasterio
+from rasterio.mask import mask
+import geopandas as gpd
+from pathlib import Path
 
 def get_point_epsg(lat: float, lon: float) -> int:
     """Determine the best EPSG code for a given latitude and longitude.
@@ -153,3 +157,102 @@ def generate_geogrids(
     )
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
     return geogrid_snapped
+
+
+def bbox84_to_bboxlocal(bbox, dst_epsg: int):
+    poly = box(*bbox)
+    gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+    gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
+    poly = gdf_src.iloc[0]
+    poly = box(*poly.bounds)
+    return poly.bounds
+
+
+def bbox84_to_ploy_in_same_crs_as_reffile(bbox: list, reffile: str):
+    with rasterio.open(reffile) as ds:
+        dst_epsg = ds.crs.to_epsg()
+        poly = box(*bbox)
+        gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+        gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
+        poly = gdf_src.iloc[0]
+    
+    return poly
+
+def clip_dem(input_dem:str, polygon: Polygon, output_dem: str):
+    with rasterio.open(input_dem) as src:
+        out_image, out_transform = mask(src, [polygon], crop=True)
+        out_meta = src.meta.copy()
+        out_meta.update({
+            "driver": "GTiff",
+            "height": out_image.shape[1],
+            "width": out_image.shape[2],
+            "transform": out_transform
+        })
+
+    with rasterio.open(output_dem, "w", **out_meta) as dest:
+        dest.write(out_image)
+
+
+def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list) -> isce3.product.GeoGridParameters:
+    """Computer a geogrid based on bbox, spacing_meters, and epsg
+
+    Args:
+        slc: Slc-derived object containing radar grid, orbit, and doppler centroid grid.
+        spacing_meters: Spacing in meters for the geogrid.
+        epsg: EPSG code for the coordinate reference system.
+        bbox: [min_lon, min_lat, max_lon, max_lat]
+    Returns:
+        A geogrid object with the specified spacing.
+    """
+
+    poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)    
+
+    clip_dem(dem_path, poly, '/tmp/clipped_dem.tif')
+    
+    dem_raster = isce3.io.Raster('/tmp/clipped_dem.tif')
+    dem = isce3.geometry.DEMInterpolator()
+    dem.load_dem(dem_raster)
+    dem.compute_min_max_mean_height()
+    min_height = dem.min_height
+    max_height = dem.max_height
+    
+    x_spacing = spacing_meters
+    y_spacing = -1 * np.abs(spacing_meters)
+
+    geogrid = isce3.product.bbox_to_geogrid(
+        slc.radar_grid,
+        slc.orbit,
+        slc.doppler_centroid_grid,
+        x_spacing,
+        y_spacing,
+        epsg,
+        min_height=min_height,
+        max_height=max_height,
+    )
+
+    '''
+    bbox_local = bbox84_to_bboxlocal(bbox,epsg)
+    minx, maxx = bbox_local[0], bbox_local[2]
+    miny, maxy = bbox_local[1], bbox_local[3]
+    x_spacing = spacing_meters
+    y_spacing = (-1.0) * spacing_meters
+    width = (maxx - minx) // x_spacing
+    length = (maxy - miny) // np.abs(y_spacing)
+
+    geogrid = isce3.product.GeoGridParameters(
+        start_x=float(minx),
+        start_y=float(maxy),
+        spacing_x=float(x_spacing),
+        spacing_y=float(y_spacing),
+        length=int(length),
+        width=int(width),
+        epsg=epsg,
+    )
+   '''
+
+    geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
+
+    Path('/tmp/clipped_dem.tif').unlink()
+
+    return geogrid_snapped
+

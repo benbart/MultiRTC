@@ -226,8 +226,18 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+    # def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+
+    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
+    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
+    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None) -> isce3.product.GeoGridParameters:
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, dem_path=dem_path, bbox=bbox)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
 
     def _print_wkt(self):
         return print_wkt(self)
@@ -342,8 +352,16 @@ class SicdPfaSlc(Slc, SicdSlc):
                 dopplers[i, j] = self.radar_grid.doppler(azimuths[i], ranges[j])
         return isce3.core.LUT2d(ranges, azimuths, dopplers)
 
-    def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
+    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
+    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
+    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None) -> isce3.product.GeoGridParameters:
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, dem_path=dem_path, bbox=bbox)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
 
     def calculate_range_range_rate_offset(self) -> np.ndarray:
         """Calculate the range and range rate offset for PFA data.
