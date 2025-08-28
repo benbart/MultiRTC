@@ -20,7 +20,7 @@ from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 
 
-SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
+SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE', 'CAPELLASP']
 
 
 def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
@@ -56,8 +56,8 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
         safe_path = burst2safe(granules=[granule], all_anns=True, work_dir=input_dir)
         orbit_path = Path(retrieve_orbit_file(safe_path.name, str(input_dir), concatenate=True))
         slc = S1BurstSlc(safe_path, orbit_path, granule)
-    elif platform in ['CAPELLA', 'ICEYE', 'UMBRA']:
-        sicd_class = {'CAPELLA': SicdRzdSlc, 'ICEYE': SicdRzdSlc, 'UMBRA': SicdPfaSlc}[platform]
+    elif platform in ['CAPELLA', 'ICEYE', 'UMBRA', 'CAPELLASP']:
+        sicd_class = {'CAPELLA': SicdRzdSlc, 'ICEYE': SicdRzdSlc, 'UMBRA': SicdPfaSlc, 'CAPELLASP': SicdPfaSlc}[platform]
         granule_path = input_dir / granule
         if not granule_path.exists():
             raise FileNotFoundError(f'SICD must be present in input dir {input_dir} for processing.')
@@ -122,10 +122,7 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
 
-    if bbox:
-        poly = box(*bbox)
-    else:
-        poly = slc.footprint
+    poly = slc.footprint
 
     if demtype == 'Copernicus 30m':
         dem_path = input_dir / 'dem_30d0.tif'
@@ -141,7 +138,6 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
         lidar_dem_orig = Path("/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_grass.tif")
         dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path)
 
-    # geogrid = slc.create_geogrid(spacing_meters=resolution, bbox=bbox)
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
 
     if slc.supports_rtc:

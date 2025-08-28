@@ -6,6 +6,7 @@ import rasterio
 from rasterio.mask import mask
 import geopandas as gpd
 from pathlib import Path
+from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
 
 def get_point_epsg(lat: float, lon: float) -> int:
     """Determine the best EPSG code for a given latitude and longitude.
@@ -193,7 +194,7 @@ def clip_dem(input_dem:str, polygon: Polygon, output_dem: str):
         dest.write(out_image)
 
 
-def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list) -> isce3.product.GeoGridParameters:
+def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list) -> isce3.product.GeoGridParameters:
     """Computer a geogrid based on bbox, spacing_meters, and epsg
 
     Args:
@@ -205,17 +206,17 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, dem_path: 
         A geogrid object with the specified spacing.
     """
 
-    poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)    
+    poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)
 
     clip_dem(dem_path, poly, '/tmp/clipped_dem.tif')
-    
+
     dem_raster = isce3.io.Raster('/tmp/clipped_dem.tif')
     dem = isce3.geometry.DEMInterpolator()
     dem.load_dem(dem_raster)
     dem.compute_min_max_mean_height()
     min_height = dem.min_height
     max_height = dem.max_height
-    
+
     x_spacing = spacing_meters
     y_spacing = -1 * np.abs(spacing_meters)
 
@@ -230,11 +231,13 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, dem_path: 
         max_height=max_height,
     )
 
+    Path('/tmp/clipped_dem.tif').unlink()
+
     '''
-    bbox_local = bbox84_to_bboxlocal(bbox,epsg)
+    bbox_local = bbox84_to_bboxlocal(bbox, epsg)
     minx, maxx = bbox_local[0], bbox_local[2]
     miny, maxy = bbox_local[1], bbox_local[3]
-    x_spacing = spacing_meters
+    x_spacing = spacing_metersq
     y_spacing = (-1.0) * spacing_meters
     width = (maxx - minx) // x_spacing
     length = (maxy - miny) // np.abs(y_spacing)
@@ -248,11 +251,8 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, dem_path: 
         width=int(width),
         epsg=epsg,
     )
-   '''
-
+    '''
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
-
-    Path('/tmp/clipped_dem.tif').unlink()
 
     return geogrid_snapped
 
