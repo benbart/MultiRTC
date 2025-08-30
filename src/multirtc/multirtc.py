@@ -7,6 +7,7 @@ sys.path.remove(sys.path[0])
 
 from shapely.geometry import Polygon, box
 from pathlib import Path
+from sarpy.utils import convert_to_sicd
 
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
@@ -39,6 +40,12 @@ def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     [d.mkdir(parents=True, exist_ok=True) for d in [input_dir, output_dir]]
     return input_dir, output_dir
 
+def convert_h5_to_nitf(h5file, outdir):
+    convert_to_sicd.convert(input_file=h5file, output_dir=outdir)
+    files = f"{Path(h5file).stem}*.nitf"
+    for file in Path(outdir).rglob(files):
+        granule = file.name
+    return granule
 
 def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     """
@@ -120,6 +127,10 @@ def run_multirtc(platform: str, granule: str, resolution: float, bbox: list, dem
         apply_rtc: If True perform radiometric correction; if False, only geocode.
     """
     input_dir, output_dir = prep_dirs(work_dir)
+
+    # convert ICEYE h5 to nitf
+    if platform == 'ICEYE' and Path(granule).suffix == '.h5':
+        granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
     slc = get_slc(platform, granule, input_dir)
 
     poly = slc.footprint

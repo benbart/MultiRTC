@@ -29,7 +29,12 @@ from multirtc import dem
 
 DEM_GEOJSON = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/v2/cop30_20250407.geojson'
 # GEOID = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/GEOID/us_nga_egm2008_1.tif'
-GEOID = '/home/jiangzhu/projects/work/crrel/egm/us_nga_egm96_15.tif'
+GEOID = '/home/conda/data/dem/egm/us_nga_egm96_15.tif'
+
+# DEM_GEODATA_GEOJSON = "/home/conda/data/dem/geodata/DGED5b_new2/JSON_AK_DGED5B_6N.geojson"
+
+DEM_GEODATA_GEOJSON = "s3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson"
+
 gdal.UseExceptions()
 ogr.UseExceptions()
 
@@ -98,6 +103,20 @@ def readgeojsonfile(geojsonfile):
     return polys
 
 
+def get_geodata_meta(geodata_geojson):
+    "s3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson"
+    path_str = geodata_geojson.split("s3://")[1]
+    bucket_name = path_str.split("/")[0]
+    file = path_str.split("/")[-1]
+    s3_object_key = path_str.split(f'{bucket_name}/')[1]
+
+    session = boto3.Session(profile_name='arctic-traffic')
+    client = session.client('s3')
+    client.download_file(bucket_name, s3_object_key, f'/tmp/{file}')
+
+    return f'/tmp/{file}'
+
+
 def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
@@ -116,15 +135,18 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
     footprints = dem.check_antimeridean(footprint)
     footprints = shapely.geometry.MultiPolygon(footprints)
 
-    godata_coperative = "/media/jiangzhu/Elements/crrel/sar_data/dem/DGED5b_new2/JSON_AK_DGED5B_6N.geojson"
+    geodata_geojson = DEM_GEODATA_GEOJSON
+    meta_geojson = get_geodata_meta(geodata_geojson)
 
-    gdf = gpd.read_file(godata_coperative)
-
+    gdf = gpd.read_file(meta_geojson)
     intersects_series = gdf.geometry.intersects(footprints)
-
     intersection_rows = gdf[intersects_series]
+    Path(meta_geojson).unlink()
 
     with TemporaryDirectory() as temp_dir:
+        session = boto3.Session(profile_name='arctic-traffic')
+        client = session.client('s3')
+        bucket_name = 'arctic-trafficability'
         input_files = []
         for index, row in intersection_rows.iterrows():
             seg2 = row['CellID']
@@ -132,13 +154,16 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
             nume = seg2[2:4]
 
             file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
-            url = f's3://arctic-trafficability/DGED5b/UTM_{zone}/{nume}/{file}'
+            s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
 
-            result = subprocess.run(['aws','s3', '--profile', 'arctic-traffic', 'cp', f'{url}', f'{temp_dir}/{file}'], capture_output=True, text=True)
+            # url = f's3://arctic-trafficability/DGED5b/UTM_{zone}/{nume}/{file}'
+            # result = subprocess.run(['aws','s3', '--profile', 'arctic-traffic', 'cp', f'{url}', f'{temp_dir}/{file}'], capture_output=True, text=True)
+            # print(result.returncode)
 
-            print(result.returncode)
+            client.download_file(bucket_name, s3_object_key, f'{temp_dir}/{file}')
 
-            if result.returncode == 0 and Path(f'{temp_dir}/{file}').exists():
+            # if result.returncode == 0 and Path(f'{temp_dir}/{file}').exists():
+            if Path(f'{temp_dir}/{file}').exists():
                 input_files.append(f'{temp_dir}/{file}')
 
         vrt_filepath = f'{temp_dir}/dem.vrt'
