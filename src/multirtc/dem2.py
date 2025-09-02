@@ -1,4 +1,5 @@
 import os
+import sys
 from collections.abc import Generator
 from pathlib import Path
 import shutil
@@ -112,9 +113,11 @@ def get_geodata_meta(geodata_geojson):
 
     session = boto3.Session(profile_name='arctic-traffic')
     client = session.client('s3')
-    client.download_file(bucket_name, s3_object_key, f'/tmp/{file}')
-
-    return f'/tmp/{file}'
+    try:
+        client.download_file(bucket_name, s3_object_key, f'/tmp/{file}')
+        return f'/tmp/{file}'
+    except Exception as e:
+        return None
 
 
 def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2) -> None:
@@ -137,6 +140,10 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
 
     geodata_geojson = DEM_GEODATA_GEOJSON
     meta_geojson = get_geodata_meta(geodata_geojson)
+
+    if not meta_geojson:
+        print('can not download the geodata meta geojosn file')
+        sys.exit(1)
 
     gdf = gpd.read_file(meta_geojson)
     intersects_series = gdf.geometry.intersects(footprints)
@@ -172,10 +179,10 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
         gdal.Translate(str(output_path), ds, format='GTiff')
         ds = None
 
-
     reproject_to_4326(output_path)
     # GEODATA 3m DEM is based on ellipsoid (EGM96), no need to do the conversion
     # convert_to_ellipsoid_based_height(output_path)
+
 
 
 def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
