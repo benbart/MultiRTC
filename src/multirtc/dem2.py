@@ -34,10 +34,11 @@ GEOID = '/home/conda/data/dem/egm/us_nga_egm96_15.tif'
 
 # DEM_GEODATA_GEOJSON = "/home/conda/data/dem/geodata/DGED5b_new2/JSON_AK_DGED5B_6N.geojson"
 
-DEM_GEODATA_GEOJSON = "s3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson"
+DEM_GEODATA_GEOJSON = 's3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson'
 
 gdal.UseExceptions()
 ogr.UseExceptions()
+
 
 def reproject_to_4326(in_raster: Path):
     in_info = gdal.Info(str(in_raster), format='json')
@@ -46,6 +47,7 @@ def reproject_to_4326(in_raster: Path):
         tmp_raster = in_raster.rename(in_raster.parent.joinpath('tmp.tif'))
         warp = gdal.Warp(in_raster, tmp_raster, dstSRS='EPSG:4326', resampleAlg='cubic')
         warp = None  # Closes the files
+
 
 def convert_to_ellipsoid_based_height(dem_file: Path) -> None:
     dem_info = gdal.Info(str(dem_file), format='json')
@@ -83,11 +85,11 @@ def process_dem(dem_file: Path):
     convert_to_height_above_ellipsoid(dem_file)
 
 
-def polygon2geojsonfile(poly:shapely.geometry.Polygon, geojsonfile, crs:str='EPSG:4326'):
+def polygon2geojsonfile(poly: shapely.geometry.Polygon, geojsonfile, crs: str = 'EPSG:4326'):
     geo_series = gpd.GeoSeries([poly])
     geo_series.crs = crs
     gdf = gpd.GeoDataFrame({'geometry': geo_series, 'id': [1]})
-    gdf.to_file(geojsonfile, driver="GeoJSON")
+    gdf.to_file(geojsonfile, driver='GeoJSON')
 
 
 def readgeojsonfile(geojsonfile):
@@ -106,9 +108,9 @@ def readgeojsonfile(geojsonfile):
 
 def get_geodata_meta(geodata_geojson):
     "s3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson"
-    path_str = geodata_geojson.split("s3://")[1]
-    bucket_name = path_str.split("/")[0]
-    file = path_str.split("/")[-1]
+    path_str = geodata_geojson.split('s3://')[1]
+    bucket_name = path_str.split('/')[0]
+    file = path_str.split('/')[-1]
     s3_object_key = path_str.split(f'{bucket_name}/')[1]
 
     session = boto3.Session(profile_name='arctic-traffic')
@@ -120,7 +122,9 @@ def get_geodata_meta(geodata_geojson):
         return None
 
 
-def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2) -> None:
+def download_geodata_cooperative_dem_for_footprint(
+    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.2
+) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
 
@@ -184,9 +188,8 @@ def download_geodata_cooperative_dem_for_footprint(output_path: Path, footprint:
     # convert_to_ellipsoid_based_height(output_path)
 
 
-
-def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
-    '''clip a raster with an polygon defined in the same crs as the input raster
+def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str):
+    """clip a raster with an polygon defined in the same crs as the input raster
 
     Args:
         input_dem: file name of the raster
@@ -195,22 +198,19 @@ def clip_dem(input_dem:str, polygon:shapely.geometry.Polygon, output_dem:str):
 
     Returns:
 
-    '''
+    """
     with rasterio.open(input_dem) as src:
         out_image, out_transform = mask(src, [polygon], crop=True)
         out_meta = src.meta.copy()
-        out_meta.update({
-            "driver": "GTiff",
-            "height": out_image.shape[1],
-            "width": out_image.shape[2],
-            "transform": out_transform
-        })
+        out_meta.update(
+            {'driver': 'GTiff', 'height': out_image.shape[1], 'width': out_image.shape[2], 'transform': out_transform}
+        )
 
-    with rasterio.open(output_dem, "w", **out_meta) as dest:
+    with rasterio.open(output_dem, 'w', **out_meta) as dest:
         dest.write(out_image)
 
 
-def padding_dem(input_dem:str, output_dem:str, pad_pixels:list):
+def padding_dem(input_dem: str, output_dem: str, pad_pixels: list):
     """
     pad nodata to the input_dem. The padding area is determined by the buffer length with the same unit
     as the input_dem. Ideally the buffer is the n*resolution of the input dem.
@@ -230,26 +230,24 @@ def padding_dem(input_dem:str, output_dem:str, pad_pixels:list):
     padded_width = src_width + pad_left + pad_right
 
     padded_transform = Affine(
-        src_transform.a, src_transform.b, src_transform.c - pad_left * src_transform.a,
-        src_transform.d, src_transform.e, src_transform.f + abs(pad_top * src_transform.e)
+        src_transform.a,
+        src_transform.b,
+        src_transform.c - pad_left * src_transform.a,
+        src_transform.d,
+        src_transform.e,
+        src_transform.f + abs(pad_top * src_transform.e),
     )
 
     profile = src.profile
-    profile.update(
-        driver = 'GTiff',
-        height = padded_height,
-        width = padded_width,
-        transform = padded_transform
-    )
+    profile.update(driver='GTiff', height=padded_height, width=padded_width, transform=padded_transform)
 
     with rasterio.open(output_dem, 'w', **profile) as dst:
         window_col_start = pad_left
         window_row_start = pad_top
-        dst.write(src.read(),
-                  window=rasterio.windows.Window(window_col_start, window_row_start, src_width, src_height))
+        dst.write(src.read(), window=rasterio.windows.Window(window_col_start, window_row_start, src_width, src_height))
 
 
-def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_dem:str):
+def extend_dem_to_polygon(input_dem: str, poly: shapely.geometry.Polygon, output_dem: str):
     """
 
     Args:
@@ -274,10 +272,10 @@ def extend_dem_to_polygon(input_dem:str, poly:shapely.geometry.Polygon, output_d
     src_bounds = poly_src.bounds
     comb_bounds = poly_comb.bounds
 
-    pad_left = int((src_bounds[0] - comb_bounds[0])/transform.a) + 5
-    pad_right = int((comb_bounds[2] - src_bounds[2])/transform.a) + 5
-    pad_bottom = int((src_bounds[1] - comb_bounds[1])/abs(transform.e)) + 5
-    pad_top = int((comb_bounds[3] - src_bounds[3])/abs(transform.e)) + 5
+    pad_left = int((src_bounds[0] - comb_bounds[0]) / transform.a) + 5
+    pad_right = int((comb_bounds[2] - src_bounds[2]) / transform.a) + 5
+    pad_bottom = int((src_bounds[1] - comb_bounds[1]) / abs(transform.e)) + 5
+    pad_top = int((comb_bounds[3] - src_bounds[3]) / abs(transform.e)) + 5
 
     padding_dem(input_dem, output_dem, [pad_left, pad_right, pad_top, pad_bottom])
 
@@ -287,16 +285,17 @@ def extend_dem_to_bounds_of_reffile(input_dem: str, ref_file: str, output_dem: s
     poly = box(*ds.bounds)
     extend_dem_to_polygon(input_dem, poly, output_dem)
 
+
 def convet_coord_of_polygon(polygon, src_epsg, dst_epsg):
-    '''convert coords of the polygon from src_epsg to dst_epsg
+    """convert coords of the polygon from src_epsg to dst_epsg
     src_epsg and dst_epsg is in the format 'EPSG:xxxxx', for example 'EPSG:32606' , 'EPSG:4326'
-    '''
+    """
     gdf_src = gpd.GeoSeries([polygon], crs=src_epsg)
     gdf_dst = gdf_src.to_crs(dst_epsg)
     return gdf_dst.iloc[0]
 
 
-def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, poly: Polygon = None):
+def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1, poly: Polygon = None):
     """Clip the raster by polygon
     Arguments:
         poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
@@ -317,7 +316,7 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, 
         gdal.Translate(output_raster, input_raster, bandList=[bandnum])
 
 
-def set_nodata(infile, nodata:float = 0.0):
+def set_nodata(infile, nodata: float = 0.0):
     # open the file for editing
     ras = gdal.Open(infile, GA_Update)
     # loop through the image bands
@@ -369,12 +368,12 @@ def fill_nodata(infile):
 def polygonize(input_raster_path, output_geojson_path):
     src_ds = gdal.Open(input_raster_path)
     if src_ds is None:
-        print(f"Could not open {input_raster_path}")
+        print(f'Could not open {input_raster_path}')
         exit()
 
-    srcband = src_ds.GetRasterBand(1) # Use the first band, adjust as needed
+    srcband = src_ds.GetRasterBand(1)  # Use the first band, adjust as needed
 
-    drv = ogr.GetDriverByName("GeoJSON")
+    drv = ogr.GetDriverByName('GeoJSON')
 
     # Delete the output file if it already exists (optional, but good for testing)
     if drv.Open(output_geojson_path, 0):
@@ -382,17 +381,17 @@ def polygonize(input_raster_path, output_geojson_path):
 
     dst_ds = drv.CreateDataSource(output_geojson_path)
     if dst_ds is None:
-        print(f"Could not create GeoJSON data source at {output_geojson_path}")
+        print(f'Could not create GeoJSON data source at {output_geojson_path}')
         exit()
 
     # Get the spatial reference from the input raster (optional, but recommended)
     srs = osr.SpatialReference()
     srs.ImportFromWkt(src_ds.GetProjectionRef())
 
-    dst_layer_name = "polygonized_features"
+    dst_layer_name = 'polygonized_features'
     dst_layer = dst_ds.CreateLayer(dst_layer_name, srs=srs, geom_type=ogr.wkbPolygon)
 
-    field_name = "DN" # Digital Number
+    field_name = 'DN'  # Digital Number
     field_defn = ogr.FieldDefn(field_name, ogr.OFTInteger)
     dst_layer.CreateField(field_defn)
 
@@ -403,11 +402,11 @@ def polygonize(input_raster_path, output_geojson_path):
 
 
 def coregister_clipped_via_reffile(infile, reffile, outfile):
-    '''coregister 30m DEM to lidar DEM
+    """coregister 30m DEM to lidar DEM
     infile: 30m dem
     reffile: lidar dem
     outfile: coregistered file
-    '''
+    """
     src_ds = gdal.Open(infile)
     ref_ds = gdal.Open(reffile)
     src_proj = src_ds.GetProjectionRef()
@@ -425,7 +424,7 @@ def coregister_clipped_via_reffile(infile, reffile, outfile):
     poly = box(*bbox)
 
     buff = 120.0
-    bbox_buff = [xmin-buff*gt_ref[1], ymin+buff*gt_ref[5], xmax+buff*gt_ref[1], ymax-buff*gt_ref[5]]
+    bbox_buff = [xmin - buff * gt_ref[1], ymin + buff * gt_ref[5], xmax + buff * gt_ref[1], ymax - buff * gt_ref[5]]
     poly_buff = box(*bbox_buff)
 
     with TemporaryDirectory() as temp_dir:
@@ -436,7 +435,7 @@ def coregister_clipped_via_reffile(infile, reffile, outfile):
             format='GTiff',
             cutlineWKT=poly_buff.wkt,
             cutlineSRS=ref_proj,
-            cropToCutline=True
+            cropToCutline=True,
         )
 
         gdal.Warp(f'{temp_dir}/tmp1.tif', infile, options=options)
@@ -449,17 +448,17 @@ def coregister_clipped_via_reffile(infile, reffile, outfile):
             xRes=gt_ref[1],
             yRes=-gt_ref[5],
             resampleAlg=gdal.GRA_Bilinear,
-            targetAlignedPixels=False
+            targetAlignedPixels=False,
         )
         gdal.Warp(outfile, f'{temp_dir}/tmp1.tif', options=options)
 
 
 def coregister(infile, reffile, outfile):
-    '''coregister 30m DEM to lidar DEM
+    """coregister 30m DEM to lidar DEM
     infile: 30m dem
     reffile: lidar dem
     outfile: coregistered file
-    '''
+    """
     src_ds = gdal.Open(infile)
     ref_ds = gdal.Open(reffile)
     src_proj = src_ds.GetProjectionRef()
@@ -477,7 +476,7 @@ def coregister(infile, reffile, outfile):
         yRes=-gt_ref[5],
         resampleAlg=gdal.GRA_Bilinear,
         targetAlignedPixels=True,
-        )
+    )
 
     gdal.Warp(outfile, infile, options=options)
 
@@ -491,6 +490,7 @@ def geo_to_pixel(geotransform, x_geo, y_geo):
     col = (x_geo - gt0) / gt1
     row = (y_geo - gt3) / gt5
     return int(col), int(row)
+
 
 def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
     coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
@@ -508,11 +508,11 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
     ds_coreg = gdal.Open(coregfile)
     gt_coreg = ds_coreg.GetGeoTransform()
     col, row = geo_to_pixel(gt_coreg, gt[0], gt[3])
-    data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()[row:ysize+row, col:xsize+col]
-    data[mask==0] = data_coreg[mask==0]
+    data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()[row : ysize + row, col : xsize + col]
+    data[mask == 0] = data_coreg[mask == 0]
 
     # write to a new file out_dem
-    driver = gdal.GetDriverByName("GTiff")
+    driver = gdal.GetDriverByName('GTiff')
     ds_out = driver.Create(out_dem, xsize, ysize, 1, gdal.GDT_Float32)
     ds_out.SetGeoTransform(ds.GetGeoTransform())  ##sets same geotransform as input
     ds_out.SetProjection(ds.GetProjection())  ##sets same projection as input
@@ -547,10 +547,10 @@ def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
     nodata_coreg = ds_coreg.GetRasterBand(1).GetNoDataValue()
     col_coreg, row_coreg = geo_to_pixel(gt_coreg, gt[0], gt[3])
     data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()
-    data_coreg[row_coreg:ysize+row_coreg, col_coreg:xsize+col_coreg][mask != 0] = data[mask != 0]
+    data_coreg[row_coreg : ysize + row_coreg, col_coreg : xsize + col_coreg][mask != 0] = data[mask != 0]
 
     # write to a new file out_dem
-    driver = gdal.GetDriverByName("GTiff")
+    driver = gdal.GetDriverByName('GTiff')
     ds_out = driver.Create(out_dem, xsize_coreg, ysize_coreg, 1, gdal.GDT_Float32)
     ds_out.SetGeoTransform(ds_coreg.GetGeoTransform())  ##sets same geotransform as input
     ds_out.SetProjection(ds_coreg.GetProjection())  ##sets same projection as input
@@ -599,13 +599,12 @@ def resample_to_3m(dem_in, dem_out):
         xRes=3.0,
         yRes=3.0,
         resampleAlg=gdal.GRA_Bilinear,
-        targetAlignedPixels=False
+        targetAlignedPixels=False,
     )
     gdal.Warp(dem_out, dem_in, options=options)
 
 
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly:Polygon):
-
+def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
     # lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
 
     # lidar_dem_orig = "/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_pdal.tif"
@@ -638,7 +637,7 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
 
     tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
 
-    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum = 1, poly = slcpoly)
+    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=slcpoly)
 
     dem_filled = extend_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m_clipped)
 
@@ -652,15 +651,16 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     # convert_to_ellipsoid_based_height(dem_path)
     return dem_path
 
+
 def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.0):
     """
-       Download the Arctic DEM for a given footprint and save it to the specified output path.
+    Download the Arctic DEM for a given footprint and save it to the specified output path.
 
-       Args:
-           output_path: Path where the DEM will be saved.
-           footprint: Polygon representing the area of interest.
-           buffer: Buffer distance in degrees to extend the footprint.
-       """
+    Args:
+        output_path: Path where the DEM will be saved.
+        footprint: Polygon representing the area of interest.
+        buffer: Buffer distance in degrees to extend the footprint.
+    """
 
     # if output_path.exists():
     #    exit(0)
@@ -669,31 +669,28 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
     footprints = dem.check_antimeridean(footprint)
     footprints = shapely.geometry.MultiPolygon(footprints)
     bbox = footprints.bounds
-    cat = pystac_client.Client.open("https://stac.pgc.umn.edu/api/v1/")
+    cat = pystac_client.Client.open('https://stac.pgc.umn.edu/api/v1/')
     # get the arcticdem-mosaics-v4.1-2m collection
     # collection = cat.get_collection("arcticdem-mosaics-v4.1-2m")
     # build the API query for the items within out bounding box and date range
-    search = cat.search(
-    collections = ["arcticdem-mosaics-v4.1-2m"],
-    bbox=bbox
-    )
+    search = cat.search(collections=['arcticdem-mosaics-v4.1-2m'], bbox=bbox)
 
     # download the files defined in the items
     output_dir = output_path.parent
-    input_files=[]
+    input_files = []
     for item in search.items():
-        s3_object_key = Path(item.assets['dem'].href.split(".com")[1])
+        s3_object_key = Path(item.assets['dem'].href.split('.com')[1])
         local_file_path = output_dir / s3_object_key.name
 
         try:
-            subprocess.run(["wget", "-P", str(output_dir), item.assets['dem'].href], check=True)
+            subprocess.run(['wget', '-P', str(output_dir), item.assets['dem'].href], check=True)
             input_files.append(local_file_path)
             print(f"File '{s3_object_key}' downloaded to '{local_file_path}' successfully.")
         except Exception as e:
-            print(f"Error downloading file: {e}")
+            print(f'Error downloading file: {e}')
             exit(1)
     if not input_files:
-        print("No dem file is available for downloading")
+        print('No dem file is available for downloading')
         exit(1)
 
     if len(input_files) == 1:
@@ -709,7 +706,7 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
 
     # clip, convert to wgs84, and convert to ellipsoid 96 based DEM
     tmpfile = output_path.rename(output_path.parent / 'tmpfile.tif')
-    clip_raster_by_poly(str(tmpfile), str(output_path), poly = box(*bbox))
+    clip_raster_by_poly(str(tmpfile), str(output_path), poly=box(*bbox))
     reproject_to_4326(output_path)
     # ArcticDEM vertical is based on WGS84 Ellipsoid, so no need to convert to ellipsoid based height
     # convert_to_ellipsoid_based_height(output_path)

@@ -8,6 +8,7 @@ import geopandas as gpd
 from pathlib import Path
 from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
 
+
 def get_point_epsg(lat: float, lon: float) -> int:
     """Determine the best EPSG code for a given latitude and longitude.
     Returns the local UTM zone for latitudes between +/-75 degrees and
@@ -176,21 +177,19 @@ def bbox84_to_ploy_in_same_crs_as_reffile(bbox: list, reffile: str):
         gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
         gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
         poly = gdf_src.iloc[0]
-    
+
     return poly
 
-def clip_dem(input_dem:str, polygon: Polygon, output_dem: str):
+
+def clip_dem(input_dem: str, polygon: Polygon, output_dem: str):
     with rasterio.open(input_dem) as src:
         out_image, out_transform = mask(src, [polygon], crop=True)
         out_meta = src.meta.copy()
-        out_meta.update({
-            "driver": "GTiff",
-            "height": out_image.shape[1],
-            "width": out_image.shape[2],
-            "transform": out_transform
-        })
+        out_meta.update(
+            {'driver': 'GTiff', 'height': out_image.shape[1], 'width': out_image.shape[2], 'transform': out_transform}
+        )
 
-    with rasterio.open(output_dem, "w", **out_meta) as dest:
+    with rasterio.open(output_dem, 'w', **out_meta) as dest:
         dest.write(out_image)
 
 
@@ -205,7 +204,7 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     Returns:
         A geogrid object with the specified spacing.
     """
-    '''
+    """
     poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)
 
     clip_dem(dem_path, poly, '/tmp/clipped_dem.tif')
@@ -233,7 +232,7 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
 
     Path('/tmp/clipped_dem.tif').unlink()
 
-    '''
+    """
     bbox_local = bbox84_to_bboxlocal(bbox, epsg)
     minx, maxx = bbox_local[0], bbox_local[2]
     miny, maxy = bbox_local[1], bbox_local[3]
@@ -255,4 +254,3 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped
-
