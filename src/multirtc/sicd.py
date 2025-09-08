@@ -226,8 +226,19 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+    # def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
+
+    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
+    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+
+    def create_geogrid(
+        self, spacing_meters: float, dem_path: Path, bbox: list = None
+    ) -> isce3.product.GeoGridParameters:
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
     def _print_wkt(self):
         return print_wkt(self)
@@ -252,13 +263,12 @@ class SicdPfaSlc(Slc, SicdSlc):
         self.transform_matrix_inv = np.linalg.inv(self.transform_matrix)
         # TOOD: this may not always be true, will need to figure out a way to check
         self.az_reversed = False
-        # Without ISCE3 support for PFA grids, these properties are undefined
+        self.radar_grid = self.get_radar_grid()
+        self.doppler_centroid_grid = self.get_doppler_centroid_grid()
+        self.supports_rtc = True
+        # Old
         self.starting_range = np.nan
-        self.radar_grid = None
-        self.doppler_centroid_grid = None
         self.prf = np.nan
-        self.az_reversed = False
-        self.supports_rtc = False
 
     def get_orbit(self) -> isce3.core.Orbit:
         """Define the orbit for the SLC.
@@ -275,6 +285,82 @@ class SicdPfaSlc(Slc, SicdSlc):
             pos = self.arp_vel * offset_sec + self.arp_pos
             svs.append(isce3.core.StateVector(t_isce, pos, self.arp_vel))
         return isce3.core.Orbit(svs, sensing_start_isce)
+
+    def get_radar_grid(self) -> isce3.product.PolarGridParameters:
+        """Define the radar grid parameters for the SLC.
+
+        Returns:
+            An instance of isce3.product.RadarGridParameters representing the radar grid.
+        """
+        arp_minus_scp = self.arp_pos - self.scp_pos
+        range_scp_to_coa = np.linalg.norm(arp_minus_scp, axis=-1)
+        range_rate_scp_to_coa = np.sum(self.arp_vel * arp_minus_scp, axis=-1) / range_scp_to_coa
+
+        polar_ang_poly = self.pfa_vars.PolarAngPoly
+        polar_ang_poly_der = polar_ang_poly.derivative(der_order=1, return_poly=True)
+        polar_ang = polar_ang_poly(self.coa_time)
+        polar_ang_rate = polar_ang_poly_der(self.coa_time)
+
+        spatial_freq_sf_poly = self.pfa_vars.SpatialFreqSFPoly
+        spatial_freq_sf_poly_der = spatial_freq_sf_poly.derivative(der_order=1, return_poly=True)
+        polar_aperture_scale_factor = spatial_freq_sf_poly(polar_ang)
+        polar_aperture_scale_factor_rate = spatial_freq_sf_poly_der(polar_ang)
+
+        radar_grid = isce3.product.PolarGridParameters(
+            sensing_start=0.0,
+            wavelength=self.wavelength,
+            center_range=range_scp_to_coa,
+            center_range_rate=range_rate_scp_to_coa,
+            polar_angle=polar_ang,
+            polar_angle_rate=polar_ang_rate,
+            polar_aperture_scale_factor=polar_aperture_scale_factor,
+            polar_aperture_scale_factor_rate=polar_aperture_scale_factor_rate,
+            range_pixel_spacing=self.source.Grid.Row.SS,
+            azimuth_pixel_spacing=self.source.Grid.Col.SS,
+            range_scene_center=self.shift[0] * self.spacing[0],
+            azimuth_scene_center=self.shift[1] * self.spacing[1],
+            range_start=0.0,
+            azimuth_start=0.0,
+            lookside=isce3.core.LookSide.Right if self.lookside == 'right' else isce3.core.LookSide.Left,
+            length=self.shape[1],  # flipped for "shadows down" convention
+            width=self.shape[0],  # flipped for "shadows down" convention
+            ref_epoch=to_isce_datetime(self.scp_time),
+        )
+        return radar_grid
+
+    def get_doppler_centroid_grid(self, uplook=10, buffer=10):
+        az_spacing = self.radar_grid.azimuth_pixel_spacing * uplook
+        az_start = self.radar_grid.azimuth_start - (buffer * az_spacing)
+        az_end = (
+            self.radar_grid.azimuth_start
+            + (self.radar_grid.length * self.radar_grid.azimuth_pixel_spacing)
+            + ((buffer + 1) * az_spacing)
+        )
+        azimuths = np.arange(az_start, az_end, az_spacing)
+
+        rg_spacing = self.radar_grid.range_pixel_spacing * uplook
+        rg_start = self.radar_grid.range_start - (buffer * rg_spacing)
+        rg_end = (
+            self.radar_grid.range_start
+            + (self.radar_grid.width * self.radar_grid.range_pixel_spacing)
+            + ((buffer + 1) * az_spacing)
+        )
+        ranges = np.arange(rg_start, rg_end, rg_spacing)
+
+        dopplers = np.zeros((azimuths.shape[0], ranges.shape[0]))
+        for i in range(azimuths.shape[0]):
+            for j in range(ranges.shape[0]):
+                dopplers[i, j] = self.radar_grid.doppler(azimuths[i], ranges[j])
+        return isce3.core.LUT2d(ranges, azimuths, dopplers)
+
+    def create_geogrid(
+        self, spacing_meters: float, dem_path: Path, bbox: list = None
+    ) -> isce3.product.GeoGridParameters:
+        """subset does not works for SicdPfaSlc, so even if user input bbox, doe not do subset"""
+        # if bbox:
+        #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
+        # else:
+        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
     def calculate_range_range_rate_offset(self) -> np.ndarray:
         """Calculate the range and range rate offset for PFA data.
@@ -341,8 +427,34 @@ class SicdPfaSlc(Slc, SicdSlc):
         for pt in rrdot.T:
             r = pt[0]
             dop = -pt[1] * 2 / wvl
+            print(pt[0], pt[1])
+            print(dop)
             llh = isce3.geometry.rdr2geo(0.0, r, self.orbit, side, dop, wvl, dem, threshold=1.0e-8, maxiter=50)
             pts_ecf.append(elp.lon_lat_to_xyz(llh))
+        return np.vstack(pts_ecf)
+
+    def rowcol2geo2(self, rc: np.ndarray, hae: float) -> np.ndarray:
+        """Transform grid (row, col) coordinates to ECEF coordinates.
+
+        Args:
+            rc: 2D array of (row, col) coordinates
+            hae: Height above ellipsoid (meters)
+
+        Returns:
+            np.ndarray: ECEF coordinates
+        """
+        dem = isce3.geometry.DEMInterpolator(hae)
+        elp = isce3.core.Ellipsoid()
+        rgaz = (rc * np.array(self.spacing)[None, :])[0]
+        r, rr = self.radar_grid.range_range_rate(rgaz[1], rgaz[0])
+        dop = self.radar_grid.doppler(rgaz[1], rgaz[0])
+        print(r, rr)
+        print(dop)
+        side = isce3.core.LookSide(1) if self.lookside == 'left' else isce3.core.LookSide(-1)
+        pts_ecf = []
+        wvl = 1.0
+        llh = isce3.geometry.rdr2geo(0.0, r, self.orbit, side, dop, wvl, dem, threshold=1.0e-8, maxiter=50)
+        pts_ecf.append(elp.lon_lat_to_xyz(llh))
         return np.vstack(pts_ecf)
 
     def geo2rowcol(self, xyz: np.ndarray) -> np.ndarray:
@@ -363,7 +475,8 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+    '''
+    def create_geogrid(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
@@ -385,14 +498,23 @@ class SicdPfaSlc(Slc, SicdSlc):
         utm_point_shift = (utm_point[0] + spacing_meters, utm_point[1])
         lla_point_shift = utm2lla.transform(*utm_point_shift)
         x_spacing = lla_point_shift[0] - lla_point[0]
-        y_spacing = -1 * x_spacing
 
-        points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
-        geos = self.rowcol2geo(points, self.scp_hae)
+        utm_point_shift = (utm_point[0], utm_point[1]-spacing_meters)
+        lla_point_shift = utm2lla.transform(*utm_point_shift)
+        y_spacing = lla_point_shift[1] - lla_point[1]
 
-        points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
-        minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
-        miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
+        # y_spacing = -1 * x_spacing
+
+        if bbox:
+            minx, maxx = bbox[0], bbox[2]
+            miny, maxy = bbox[1], bbox[3]
+        else:
+            points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
+            geos = self.rowcol2geo(points, self.scp_hae)
+            
+            points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
+            minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
+            miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
 
         width = (maxx - minx) // x_spacing
         length = (maxy - miny) // np.abs(y_spacing)
@@ -407,3 +529,4 @@ class SicdPfaSlc(Slc, SicdSlc):
         )
         geogrid_snapped = define_geogrid.snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
         return geogrid_snapped
+        '''

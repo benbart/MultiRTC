@@ -150,7 +150,7 @@ def compute_correction_lut(
 
 
 def compute_layover_shadow_mask(
-    radar_grid: isce3.product.RadarGridParameters,
+    radar_grid: isce3.product.RadarGridParameters | isce3.product.PolarGridParameters,
     orbit: isce3.core.Orbit,
     geogrid_in: isce3.product.GeoGridParameters,
     dem_raster: isce3.io.Raster,
@@ -214,17 +214,18 @@ def compute_layover_shadow_mask(
     slantrange_layover_shadow_mask_raster: isce3.io.Raster
         Layover/shadow-mask ISCE3 raster object in radar coordinates
     """
-    if doppler is None:
-        doppler = isce3.core.LUT2d()
-
     # Run topo to get layover/shadow mask
     ellipsoid = isce3.core.Ellipsoid()
-    grid_doppler = doppler
-    rdr2geo_obj = isce3.geometry.Rdr2Geo(
+    if isinstance(radar_grid, isce3.product.RadarGridParameters):
+        rdr2geo_class = isce3.geometry.Rdr2Geo
+    elif isinstance(radar_grid, isce3.product.PolarGridParameters):
+        rdr2geo_class = isce3.geometry.Rdr2GeoPolar
+
+    rdr2geo_obj = rdr2geo_class(
         radar_grid,
         orbit,
         ellipsoid,
-        grid_doppler,
+        doppler,
         threshold=threshold_rdr2geo,
         numiter=numiter_rdr2geo,
         extraiter=extraiter_rdr2geo,
@@ -284,7 +285,13 @@ def compute_layover_shadow_mask(
         slantrange_layover_shadow_mask_raster = isce3.io.Raster(path_layover_shadow_mask_file)
 
     # geocode the layover/shadow mask
-    geo = isce3.geocode.GeocodeFloat32()
+    if isinstance(radar_grid, isce3.product.RadarGridParameters):
+        geo = isce3.geocode.GeocodeFloat32()
+    elif isinstance(radar_grid, isce3.product.PolarGridParameters):
+        geo = isce3.geocode.GeocodePolarFloat32()
+    else:
+        raise NotImplementedError('Unsupported radar grid type for geocoding')
+
     geo.orbit = orbit
     geo.ellipsoid = ellipsoid
     geo.doppler = doppler
@@ -323,7 +330,6 @@ def compute_layover_shadow_mask(
     # flush data to the disk
     geocoded_layover_shadow_mask_raster.close_dataset()
     del geocoded_layover_shadow_mask_raster
-
     return slantrange_layover_shadow_mask_raster
 
 
@@ -375,8 +381,7 @@ def save_intermediate_geocode_files(
     extension,
     dem_raster,
     radar_grid_file_dict,
-    lookside,
-    wavelength,
+    radar_grid,
     orbit,
     doppler=None,
 ):
@@ -416,16 +421,13 @@ def save_intermediate_geocode_files(
         # range_slope_raster, # FIXME
     ) = raster_objs
 
-    # TODO review this (Doppler)!!!
-    # native_doppler = burst.doppler.lut2d
     native_doppler = doppler
     native_doppler.bounds_error = False
     grid_doppler = doppler
     grid_doppler.bounds_error = False
 
     isce3.geogrid.get_radar_grid(
-        lookside,
-        wavelength,
+        radar_grid,
         dem_raster,
         geogrid,
         orbit,
@@ -481,7 +483,8 @@ def rtc(slc, geogrid, opts):
 
     if isinstance(slc, SicdSlc):
         input_filename = slc.filepath.parent / (slc.filepath.stem + '_beta0.tif')
-        slc.create_complex_beta0(input_filename)
+        if not input_filename.exists():
+            slc.create_complex_beta0(input_filename)
         input_filename = str(input_filename)
     elif isinstance(slc, S1BurstSlc):
         input_filename = slc.filepath.parent / (slc.filepath.stem + '_beta0.tif')
@@ -549,17 +552,30 @@ def rtc(slc, geogrid, opts):
     )
 
     # init Geocode object depending on raster type
-    if rdr_raster.datatype() == gdal.GDT_Float32:
-        geo_obj = isce3.geocode.GeocodeFloat32()
-    elif rdr_raster.datatype() == gdal.GDT_Float64:
-        geo_obj = isce3.geocode.GeocodeFloat64()
-    elif rdr_raster.datatype() == gdal.GDT_CFloat32:
-        geo_obj = isce3.geocode.GeocodeCFloat32()
-    elif rdr_raster.datatype() == gdal.GDT_CFloat64:
-        geo_obj = isce3.geocode.GeocodeCFloat64()
+    if isinstance(radar_grid, isce3.product.RadarGridParameters):
+        if rdr_raster.datatype() == gdal.GDT_Float32:
+            geo_obj = isce3.geocode.GeocodeFloat32()
+        elif rdr_raster.datatype() == gdal.GDT_Float64:
+            geo_obj = isce3.geocode.GeocodeFloat64()
+        elif rdr_raster.datatype() == gdal.GDT_CFloat32:
+            geo_obj = isce3.geocode.GeocodeCFloat32()
+        elif rdr_raster.datatype() == gdal.GDT_CFloat64:
+            geo_obj = isce3.geocode.GeocodeCFloat64()
+        else:
+            raise NotImplementedError('Unsupported raster type for geocoding')
+    elif isinstance(radar_grid, isce3.product.PolarGridParameters):
+        if rdr_raster.datatype() == gdal.GDT_Float32:
+            geo_obj = isce3.geocode.GeocodePolarFloat32()
+        elif rdr_raster.datatype() == gdal.GDT_Float64:
+            geo_obj = isce3.geocode.GeocodePolarFloat64()
+        elif rdr_raster.datatype() == gdal.GDT_CFloat32:
+            geo_obj = isce3.geocode.GeocodePolarCFloat32()
+        elif rdr_raster.datatype() == gdal.GDT_CFloat64:
+            geo_obj = isce3.geocode.GeocodePolarCFloat64()
+        else:
+            raise NotImplementedError('Unsupported raster type for geocoding')
     else:
-        err_str = 'Unsupported raster type for geocoding'
-        raise NotImplementedError(err_str)
+        raise NotImplementedError('Unsupported radar grid type for geocoding')
 
     # init geocode members
     geo_obj.orbit = orbit
@@ -632,8 +648,7 @@ def rtc(slc, geogrid, opts):
             raster_extension,
             dem_raster,
             radar_grid_file_dict,
-            lookside,
-            wavelength,
+            radar_grid,
             orbit,
             doppler=doppler,
         )
