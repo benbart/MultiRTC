@@ -296,7 +296,7 @@ def convet_coord_of_polygon(polygon, src_epsg, dst_epsg):
     return gdf_dst.iloc[0]
 
 
-def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, poly: shapely.geometry.Polygon = None):
+def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, poly: Polygon = None):
     """Clip the raster by polygon
     Arguments:
         poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
@@ -310,7 +310,7 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum:int = 1, 
         poly = gdf_src.iloc[0]
         poly = box(*poly.bounds)
         bounds = poly.bounds
-        clip_extent = (bounds[0]-50, bounds[3]+50, bounds[2]+50, bounds[1]-50)
+        clip_extent = (bounds[0], bounds[3], bounds[2], bounds[1])
         # clip_extent (upper_left_x, upper_left_y, lower_right_x, lower_right_y)
         gdal.Translate(output_raster, input_raster, projWin=clip_extent, bandList=[bandnum])
     else:
@@ -402,7 +402,7 @@ def polygonize(input_raster_path, output_geojson_path):
     dst_ds = None
 
 
-def coregister(infile, reffile, outfile):
+def coregister_clipped_via_reffile(infile, reffile, outfile):
     '''coregister 30m DEM to lidar DEM
     infile: 30m dem
     reffile: lidar dem
@@ -453,6 +453,35 @@ def coregister(infile, reffile, outfile):
         )
         gdal.Warp(outfile, f'{temp_dir}/tmp1.tif', options=options)
 
+
+def coregister(infile, reffile, outfile):
+    '''coregister 30m DEM to lidar DEM
+    infile: 30m dem
+    reffile: lidar dem
+    outfile: coregistered file
+    '''
+    src_ds = gdal.Open(infile)
+    ref_ds = gdal.Open(reffile)
+    src_proj = src_ds.GetProjectionRef()
+    ref_proj = ref_ds.GetProjectionRef()
+    x_size, y_size = ref_ds.RasterXSize, ref_ds.RasterYSize
+    # nodata = ref_ds.GetRasterBand(1).GetNoDataValue()
+    gt_ref = ref_ds.GetGeoTransform()
+
+    # resample
+    options = gdal.WarpOptions(
+        format='GTiff',
+        srcSRS=src_proj,
+        dstSRS=ref_proj,
+        xRes=gt_ref[1],
+        yRes=-gt_ref[5],
+        resampleAlg=gdal.GRA_Bilinear,
+        targetAlignedPixels=True,
+        )
+
+    gdal.Warp(outfile, infile, options=options)
+
+
 def geo_to_pixel(geotransform, x_geo, y_geo):
     """
     Converts geographic coordinates (x_geo, y_geo) to pixel coordinates (col, row)
@@ -498,6 +527,45 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
 
     return out_dem
 
+
+def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
+    coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
+    coregister(other_dem, lidar_dem, coregfile)
+
+    out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
+    ds = gdal.Open(lidar_dem)
+    gt = ds.GetGeoTransform()
+    band = ds.GetRasterBand(1)
+    nodata = band.GetNoDataValue()
+    data = band.ReadAsArray()
+    mask = band.GetMaskBand().ReadAsArray()
+    xsize, ysize = ds.RasterXSize, ds.RasterYSize
+
+    ds_coreg = gdal.Open(coregfile)
+    gt_coreg = ds_coreg.GetGeoTransform()
+    xsize_coreg, ysize_coreg = ds_coreg.RasterXSize, ds_coreg.RasterYSize
+    nodata_coreg = ds_coreg.GetRasterBand(1).GetNoDataValue()
+    col_coreg, row_coreg = geo_to_pixel(gt_coreg, gt[0], gt[3])
+    data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()
+    data_coreg[row_coreg:ysize+row_coreg, col_coreg:xsize+col_coreg][mask != 0] = data[mask != 0]
+
+    # write to a new file out_dem
+    driver = gdal.GetDriverByName("GTiff")
+    ds_out = driver.Create(out_dem, xsize_coreg, ysize_coreg, 1, gdal.GDT_Float32)
+    ds_out.SetGeoTransform(ds_coreg.GetGeoTransform())  ##sets same geotransform as input
+    ds_out.SetProjection(ds_coreg.GetProjection())  ##sets same projection as input
+    ds_out.GetRasterBand(1).WriteArray(data_coreg)
+    if nodata_coreg:
+        ds_out.GetRasterBand(1).SetNoDataValue(nodata_coreg)
+
+    ds_out.FlushCache()
+    ds = None
+    ds_coreg = None
+    ds_out = None
+
+    return out_dem
+
+
 def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     """clip lidar dem file with bbox [minlon, minlat, maxlon,maxlat]
 
@@ -536,7 +604,7 @@ def resample_to_3m(dem_in, dem_out):
     gdal.Warp(dem_out, dem_in, options=options)
 
 
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path):
+def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly:Polygon):
 
     # lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
 
@@ -564,11 +632,15 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path):
     ds = None
 
     tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
-    if Path(tmp_dem_30m).exists():
+    if tmp_dem_30m.exists():
         os.remove(tmp_dem_30m)
-    dem.download_opera_dem_for_footprint(Path(tmp_dem_30m), poly84)
+    dem.download_opera_dem_for_footprint(tmp_dem_30m, poly84)
 
-    dem_filled = fill_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m)
+    tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
+
+    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum = 1, poly = slcpoly)
+
+    dem_filled = extend_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m_clipped)
 
     # resample to 3m
     # resample_to_3m(dem_filled, dem_path)

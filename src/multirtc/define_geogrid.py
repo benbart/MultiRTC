@@ -205,7 +205,7 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     Returns:
         A geogrid object with the specified spacing.
     """
-
+    '''
     poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)
 
     clip_dem(dem_path, poly, '/tmp/clipped_dem.tif')
@@ -237,7 +237,7 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     bbox_local = bbox84_to_bboxlocal(bbox, epsg)
     minx, maxx = bbox_local[0], bbox_local[2]
     miny, maxy = bbox_local[1], bbox_local[3]
-    x_spacing = spacing_metersq
+    x_spacing = spacing_meters
     y_spacing = (-1.0) * spacing_meters
     width = (maxx - minx) // x_spacing
     length = (maxy - miny) // np.abs(y_spacing)
@@ -251,7 +251,7 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
         width=int(width),
         epsg=epsg,
     )
-    '''
+
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped

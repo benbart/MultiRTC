@@ -37,9 +37,9 @@ def get_las_crs(input_las_file):
         return None
 
 
-def convert_las_2_dem(input_las_file, output_dem_file):
+def convert_las_2_dem(input_las_file, output_dem_file, resolution:float = 1.0):
 
-    resolution = 1.0  # Desired resolution of the DEM in meters (or units of the input data)
+    # resolution = 1.0  # Desired resolution of the DEM in meters (or units of the input data)
 
     # Create a PDAL pipeline as a JSON string
     # This pipeline reads the LAS file, optionally filters for ground points (classification 2),
@@ -118,10 +118,10 @@ def main():
     # parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--input', type=str, required=True, help='file name of the lidar las format file')
     parser.add_argument('--output', type=str, required=True, help='file name of the output dem file')
-
+    parser.add_argument('--resolution', type=float, default=1.0, help='resolution of output dem file')
     args = parser.parse_args()
 
-    convert_las_2_dem(args.input, args.output)
+    convert_las_2_dem(args.input, args.output, args.resolution)
     # fill_dem("/tmp/dem.tif", args.output)
 
 if __name__ == "__main__":
