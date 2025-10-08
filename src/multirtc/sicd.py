@@ -232,9 +232,8 @@ class SicdRzdSlc(Slc, SicdSlc):
     # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
     #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
-    def create_geogrid(
-        self, spacing_meters: float, dem_path: Path, bbox: list = None
-    ) -> isce3.product.GeoGridParameters:
+    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
+                       ) -> isce3.product.GeoGridParameters:
         if bbox:
             return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
         else:
@@ -353,10 +352,9 @@ class SicdPfaSlc(Slc, SicdSlc):
                 dopplers[i, j] = self.radar_grid.doppler(azimuths[i], ranges[j])
         return isce3.core.LUT2d(ranges, azimuths, dopplers)
 
-    def create_geogrid(
-        self, spacing_meters: float, dem_path: Path, bbox: list = None
-    ) -> isce3.product.GeoGridParameters:
-        """subset does not works for SicdPfaSlc, so even if user input bbox, doe not do subset"""
+    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
+                       ) -> isce3.product.GeoGridParameters:
+        """subset does not works for SicdPfaSlc, so even if user input bbox, does not do subset"""
         # if bbox:
         #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
         # else:

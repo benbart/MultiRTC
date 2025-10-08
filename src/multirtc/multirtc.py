@@ -138,6 +138,7 @@ def run_multirtc(
     # convert ICEYE h5 to nitf
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
+
     slc = get_slc(platform, granule, input_dir)
 
     poly = slc.footprint
