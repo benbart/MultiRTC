@@ -34,7 +34,7 @@ GEOID = '/home/conda/data/dem/egm/us_nga_egm96_15.tif'
 
 # DEM_GEODATA_GEOJSON = "/home/conda/data/dem/geodata/DGED5b_new2/JSON_AK_DGED5B_6N.geojson"
 
-DEM_GEODATA_GEOJSON = 's3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson'
+DEM_GEODATA_GEOJSON = 's3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_all.geojson'
 
 gdal.UseExceptions()
 ogr.UseExceptions()
