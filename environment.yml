@@ -20,6 +20,10 @@ dependencies:
   - tqdm
   - requests
   - urllib3
+  - geojson
+  - geopandas
+  - rasterio
+  - pystac-client
   # For multimetric
   - matplotlib
   - pandas

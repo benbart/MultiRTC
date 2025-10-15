@@ -28,9 +28,12 @@ src/multirtc/base.py
 src/multirtc/create_rtc.py
 src/multirtc/define_geogrid.py
 src/multirtc/dem.py
+src/multirtc/dem2.py
 src/multirtc/fetch.py
 src/multirtc/geocode.py
+src/multirtc/las_2_dem_via_pdal.py
 src/multirtc/multirtc.py
+src/multirtc/prep_capella.py
 src/multirtc/rtc_options.py
 src/multirtc/sentinel1.py
 src/multirtc/sicd.py

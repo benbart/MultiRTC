@@ -226,18 +226,8 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    # def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
-
-    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
-
-    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
-                       ) -> isce3.product.GeoGridParameters:
-        if bbox:
-            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
-        else:
-            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+    def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
+        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
 
     def _print_wkt(self):
         return print_wkt(self)
@@ -352,12 +342,7 @@ class SicdPfaSlc(Slc, SicdSlc):
                 dopplers[i, j] = self.radar_grid.doppler(azimuths[i], ranges[j])
         return isce3.core.LUT2d(ranges, azimuths, dopplers)
 
-    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
-                       ) -> isce3.product.GeoGridParameters:
-        """subset does not works for SicdPfaSlc, so even if user input bbox, does not do subset"""
-        # if bbox:
-        #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
-        # else:
+    def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
     def calculate_range_range_rate_offset(self) -> np.ndarray:
@@ -472,59 +457,3 @@ class SicdPfaSlc(Slc, SicdSlc):
         rgaz += np.array(self.shift)[:, None]
         row_col = rgaz.T.copy()
         return row_col
-
-    '''
-    def create_geogrid(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
-        """Create a geogrid for the PFA SLC.
-        Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
-
-        Args:
-            spacing_meters: Spacing in meters for the geogrid.
-
-        Returns:
-            isce3.product.GeoGridParameters: The generated geogrid parameters.
-        """
-        ecef = pyproj.CRS(4978)  # ECEF on WGS84 Ellipsoid
-        lla = pyproj.CRS(4979)  # WGS84 lat/lon/ellipsoid height
-        local_utm = pyproj.CRS(define_geogrid.get_point_epsg(self.center.y, self.center.x))
-        lla2utm = pyproj.Transformer.from_crs(lla, local_utm, always_xy=True)
-        utm2lla = pyproj.Transformer.from_crs(local_utm, lla, always_xy=True)
-        ecef2lla = pyproj.Transformer.from_crs(ecef, lla, always_xy=True)
-
-        lla_point = (self.center.x, self.center.y)
-        utm_point = lla2utm.transform(*lla_point)
-        utm_point_shift = (utm_point[0] + spacing_meters, utm_point[1])
-        lla_point_shift = utm2lla.transform(*utm_point_shift)
-        x_spacing = lla_point_shift[0] - lla_point[0]
-
-        utm_point_shift = (utm_point[0], utm_point[1]-spacing_meters)
-        lla_point_shift = utm2lla.transform(*utm_point_shift)
-        y_spacing = lla_point_shift[1] - lla_point[1]
-
-        # y_spacing = -1 * x_spacing
-
-        if bbox:
-            minx, maxx = bbox[0], bbox[2]
-            miny, maxy = bbox[1], bbox[3]
-        else:
-            points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
-            geos = self.rowcol2geo(points, self.scp_hae)
-            
-            points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
-            minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
-            miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])
-
-        width = (maxx - minx) // x_spacing
-        length = (maxy - miny) // np.abs(y_spacing)
-        geogrid = isce3.product.GeoGridParameters(
-            start_x=float(minx),
-            start_y=float(maxy),
-            spacing_x=float(x_spacing),
-            spacing_y=float(y_spacing),
-            length=int(length),
-            width=int(width),
-            epsg=4326,
-        )
-        geogrid_snapped = define_geogrid.snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
-        return geogrid_snapped
-        '''

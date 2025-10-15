@@ -16,6 +16,10 @@ pandas
 lmfit
 scipy
 scikit-image
+geojson
+geopandas
+rasterio
+pystac-client
 
 [develop]
 pytest

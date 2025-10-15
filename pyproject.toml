@@ -38,6 +38,10 @@ dependencies = [
     "lmfit",
     "scipy",
     "scikit-image",
+    "geojson",
+    "geopandas",
+    "rasterio",
+    "pystac-client",
 ]
 dynamic = ["version", "readme"]
 

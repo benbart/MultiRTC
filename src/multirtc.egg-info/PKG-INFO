@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: multirtc
-Version: 0.5.3.dev51+g9a95d980f
+Version: 0.5.3.dev51+g9a95d980f.d20251015
 Summary: Python library for multi-sensor RTC processing using the OPERA algorithm
 Author-email: Forrest Williams <ffwilliams2@alaska.edu>
 License: BSD-3-Clause
@@ -33,6 +33,10 @@ Requires-Dist: pandas
 Requires-Dist: lmfit
 Requires-Dist: scipy
 Requires-Dist: scikit-image
+Requires-Dist: geojson
+Requires-Dist: geopandas
+Requires-Dist: rasterio
+Requires-Dist: pystac-client
 Provides-Extra: develop
 Requires-Dist: pytest; extra == "develop"
 Requires-Dist: pytest-cov; extra == "develop"

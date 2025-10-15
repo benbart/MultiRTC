@@ -483,8 +483,7 @@ def rtc(slc, geogrid, opts):
 
     if isinstance(slc, SicdSlc):
         input_filename = slc.filepath.parent / (slc.filepath.stem + '_beta0.tif')
-        if not input_filename.exists():
-            slc.create_complex_beta0(input_filename)
+        slc.create_complex_beta0(input_filename)
         input_filename = str(input_filename)
     elif isinstance(slc, S1BurstSlc):
         input_filename = slc.filepath.parent / (slc.filepath.stem + '_beta0.tif')
