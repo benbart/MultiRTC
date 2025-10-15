@@ -40,7 +40,7 @@ dependencies = [
     "geojson",
     "geopandas",
     "rasterio",
-    "pystac_client",
+    "pystac-client",
 ]
 dynamic = ["version", "readme"]
 
