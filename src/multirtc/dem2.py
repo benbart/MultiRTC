@@ -156,6 +156,13 @@ def download_geodata_cooperative_dem_for_footprint(
 
     with TemporaryDirectory() as temp_dir:
         session = boto3.Session(profile_name='arctic-traffic')
+        # AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+        # AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+        # session = boto3.Session(
+        #    aws_access_key_id=AWS_ACCESS_KEY_ID,
+        #    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        #    region_name='us-east-2'  # Optional: specify your desired region
+        # )
         client = session.client('s3')
         bucket_name = 'arctic-trafficability'
         input_files = []

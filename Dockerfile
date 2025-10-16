@@ -74,9 +74,20 @@ RUN mkdir -p ./isce3/isce3_install
 
 COPY --chown=${CONDA_UID}:${CONDA_GID} --from=builder /home/conda/isce3/isce3_install /home/conda/isce3/isce3_install
 
-ENV PATH=/home/conda/isce3/isce3_install/bin:/home/conda/isce3/isce3_install/packages/nisar/workflows:$PATH \
-    PYTHONPATH=/home/conda/isce3/isce3_install/packages:/home/conda/isce3/isce3_install/lib:$PYTHONPATH \
-    LD_LIBRARY_PATH=/home/conda/isce3/isce3_install/lib:$LD_LIBRARY_PATH \
+# original env
+# ENV PATH=/home/conda/isce3/isce3_install/bin:/home/conda/isce3/isce3_install/packages/nisar/workflows:$PATH \
+#    PYTHONPATH=/home/conda/isce3/isce3_install/packages:/home/conda/isce3/isce3_install/lib:$PYTHONPATH \
+#    LD_LIBRARY_PATH=/home/conda/isce3/isce3_install/lib:$LD_LIBRARY_PATH \
+#    GDAL_VRT_ENABLE_PYTHON=YES
+
+
+ENV ISCE_INSTALL=/home/conda/isce3/isce3_install
+    PATH=$ISCE_INSTALL/bin:$PATH
+    PATH=$ISCE_INSTALL/packages/nisar/workflows/:$PATH
+    PYTHONPATH=$ISCE_INSTALL/packages:$PYTHONPATH
+    PYTHONPATH=$ISCE_INSTALL/lib:$PYTHONPATH
+    LD_LIBRARY_PATH=$ISCE_INSTALL/lib:$LD_LIBRARY_PATH
+    DYLD_LIBRARY_PATH=$ISCE_INSTALL/lib:$DYLD_LIBRARY_PATH
     GDAL_VRT_ENABLE_PYTHON=YES
 
 ENTRYPOINT ["/home/conda/multirtc/src/multirtc/etc/entrypoint.sh"]
