@@ -22,7 +22,7 @@ import subprocess
 import rasterio
 from rasterio.transform import Affine
 from rasterio.mask import mask
-from shapely.geometry import LinearRing, Polygon, box
+from shapely.geometry import shape, LinearRing, Polygon, box
 import pystac_client
 
 from multirtc import dem
@@ -200,7 +200,7 @@ def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str)
 
     Args:
         input_dem: file name of the raster
-        polygon: shapely.geometry.Polygon
+        polygon: shapely.geometry.Polygon, the same crs as the input_dem
         output_dem: filename of the clipped raster
 
     Returns:
@@ -215,6 +215,39 @@ def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str)
 
     with rasterio.open(output_dem, 'w', **out_meta) as dest:
         dest.write(out_image)
+
+
+def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str, nodata: float = 0):
+    """clip a raster with a polygon defined in wgs84 (longitude and latitude)
+
+    Args:
+        input_dem: file name of the raster
+        polygon: shapely.geometry.Polygon, in WGS84 crs
+        nodata: nodata value
+        output_dem: filename of the clipped raster
+
+    Returns:
+
+    """
+    with rasterio.open(input_dem) as src:
+        gdf84 = gpd.GeoSeries([polygon], crs=f'EPSG:4326')
+        src_epsg = src.profile['crs'].to_epsg()
+        gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
+        polygon_src = gdf_src.iloc[0]
+        out_image, out_transform = mask(src, [polygon_src], crop=True)
+        out_meta = src.meta.copy()
+        out_meta.update(
+            {'driver': 'GTiff',
+             'height': out_image.shape[1],
+             'width': out_image.shape[2],
+             'transform': out_transform,
+             'nodata': nodata}
+        )
+
+    with rasterio.open(output_dem, 'w', **out_meta) as dest:
+        dest.write(out_image)
+
+
 
 
 def padding_dem(input_dem: str, output_dem: str, pad_pixels: list):

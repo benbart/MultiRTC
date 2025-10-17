@@ -169,6 +169,12 @@ def run_multirtc(
             apply_static_tropo=slc.supports_static_tropo,
         )
         rtc(slc, geogrid, opts)
+
+        rtcfile = output_dir / f'{slc.filepath.stem}.tif'
+
+        if rtcfile.exists():
+            rtcfile2 = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
+            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile2, nodata = 0)
     else:
         raise NotImplementedError(
             'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
