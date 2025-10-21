@@ -173,8 +173,10 @@ def run_multirtc(
         rtcfile = output_dir / f'{slc.filepath.stem}.tif'
 
         if rtcfile.exists():
-            rtcfile2 = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
-            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile2, nodata = 0)
+            rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
+            rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
+            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = 0)
+            dem2.linear_to_db(rtcfile_clip, rtcfile_db)
     else:
         raise NotImplementedError(
             'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'

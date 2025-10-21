@@ -248,6 +248,59 @@ def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, outpu
         dest.write(out_image)
 
 
+def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
+    """
+    Converts a linear-scale raster to decibel (dB) scale.
+
+    Args:
+        input_path (str): Path to the input linear-scale GeoTIFF file.
+        output_path (str): Path to the output dB-scale GeoTIFF file.
+        ref (float): The reference value for the dB conversion (default is 1.0).
+        nodata (any, optional): The NoData value for the input raster.
+                                If None, the source's NoData value is used.
+    """
+    with rasterio.open(input_path) as src:
+        # Read the data as a numpy array
+        linear_data = src.read(1).astype(np.float32)  # Ensure float data type for math
+
+        # Get metadata for the output file
+        profile = src.profile
+
+        # Use source nodata if not provided
+        if nodata is None:
+            nodata = src.nodata
+
+    # Handle NoData values
+    if nodata is not None:
+        # Create a mask for NoData values
+        mask = (linear_data == nodata)
+        # Set nodata values to a safe value (e.g., NaN) before log operation
+        linear_data[mask] = np.nan
+
+    # Apply the dB conversion formula
+    # Use np.maximum to prevent log of zero or negative values (if not handled by nodata)
+    # The librosa library uses a small 'amin' value (e.g., 1e-10) for numerical stability if needed
+    linear_data = np.maximum(linear_data, 1e-10)  # Clamp values to avoid issues
+    db_data = 10 * np.log10(linear_data / ref)
+
+    # Set the nodata values in the new array back to the specified nodata value
+    if nodata is not None:
+        # Replace NaN with the nodata value if it was set
+        if np.isnan(nodata):
+            pass  # NaN values are already masked correctly in a masked array concept
+        else:
+            db_data[np.isnan(db_data)] = nodata
+
+    # Update the profile for the output raster
+    profile.update(
+        dtype=np.float32,  # dB data should be float
+        nodata=nodata,
+        compress='lzw'  # Optional: add compression
+    )
+
+    # Write the dB data to a new GeoTIFF file
+    with rasterio.open(output_path, 'w', **profile) as dst:
+        dst.write(db_data, 1)
 
 
 def padding_dem(input_dem: str, output_dem: str, pad_pixels: list):
