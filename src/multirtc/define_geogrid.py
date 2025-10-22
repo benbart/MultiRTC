@@ -254,3 +254,47 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped
+
+
+def generate_geogrids_via_bbox2(slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list) -> isce3.product.GeoGridParameters:
+    """Computer a geogrid based on bbox, spacing_meters, and epsg
+
+    Args:
+        slc: Slc-derived object containing radar grid, orbit, and doppler centroid grid.
+        spacing_meters: Spacing in meters for the geogrid.
+        epsg: EPSG code for the coordinate reference system.
+        bbox: [min_lon, min_lat, max_lon, max_lat]
+    Returns:
+        A geogrid object with the specified spacing.
+    """
+
+    poly = bbox84_to_ploy_in_same_crs_as_reffile(bbox, dem_path)
+
+    clip_dem(dem_path, poly, '/tmp/clipped_dem.tif')
+
+    dem_raster = isce3.io.Raster('/tmp/clipped_dem.tif')
+    dem = isce3.geometry.DEMInterpolator()
+    dem.load_dem(dem_raster)
+    dem.compute_min_max_mean_height()
+    min_height = dem.min_height
+    max_height = dem.max_height
+
+    x_spacing = spacing_meters
+    y_spacing = -1 * np.abs(spacing_meters)
+
+    geogrid = isce3.product.bbox_to_geogrid(
+        slc.radar_grid,
+        slc.orbit,
+        slc.doppler_centroid_grid,
+        x_spacing,
+        y_spacing,
+        epsg,
+        min_height=min_height,
+        max_height=max_height,
+    )
+
+    Path('/tmp/clipped_dem.tif').unlink()
+
+    geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
+
+    return geogrid_snapped

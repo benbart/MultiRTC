@@ -7,7 +7,7 @@ import pyproj
 from numpy.polynomial.polynomial import polyval2d
 from osgeo import gdal
 from sarpy.io.complex.sicd import SICDReader
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point, Polygon, box
 
 from multirtc import define_geogrid
 from multirtc.base import Slc, print_wkt, to_isce_datetime
@@ -226,12 +226,6 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-    # def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
-
-    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
-
     def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
                        ) -> isce3.product.GeoGridParameters:
         if bbox:
@@ -356,7 +350,7 @@ class SicdPfaSlc(Slc, SicdSlc):
                        ) -> isce3.product.GeoGridParameters:
         """subset does not works for SicdPfaSlc, so even if user input bbox, does not do subset"""
         # if bbox:
-        #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
+        #    return define_geogrid.generate_geogrids_via_bbox2(self, spacing_meters, 4326, dem_path, bbox=bbox)
         # else:
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
@@ -473,8 +467,41 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-    '''
-    def create_geogrid(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
+    def bbox2rowcolbox(self, bbox: list):
+        """
+
+        Parameters
+        ----------
+        bbox: [minlon, maxlon, minlat, maxlat]
+
+        Returns
+        rowcolbox: (minrow, maxrow, mincol, maccol)
+        -------
+
+        """
+        ecef = pyproj.CRS(4978)  # ECEF on WGS84 Ellipsoid
+        lla = pyproj.CRS(4979)  # WGS84 lat/lon/ellipsoid height
+        ecef2lla = pyproj.Transformer.from_crs(ecef, lla, always_xy=True)
+        lla2ecef = pyproj.Transformer.from_crs(lla, ecef, always_xy=True)
+
+        poly = box(*bbox)
+        xx, yy = poly.exterior.coords.xy
+        xx1 = np.array(xx)
+        yy1 = np.array(yy)
+        zz1 = np.zeros_like(xx1)
+        zz1[:] = self.scp_hae
+        v = lla2ecef.transform(xx1,yy1,zz1)
+        v = np.vstack(v).T
+        rowcol = self.geo2rowcol(v)
+
+        rowcolbox = (int(rowcol[:,0].min()), int(rowcol[:,0].max()),
+                     int(rowcol[:,1].min()), int(rowcol[:,1].max()))
+
+        return rowcolbox
+
+
+
+    def create_geogrid2(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
@@ -527,4 +554,4 @@ class SicdPfaSlc(Slc, SicdSlc):
         )
         geogrid_snapped = define_geogrid.snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
         return geogrid_snapped
-        '''
+

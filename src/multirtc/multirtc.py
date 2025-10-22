@@ -79,45 +79,6 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-'''
-def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path, apply_rtc=True) -> None:
->>>>>>> jz_dev
-    """Create an RTC or Geocoded dataset using the OPERA algorithm.
-
-    Args:
-        platform: Platform type (e.g., 'UMBRA').
-        granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
-        resolution: Resolution of the output RTC (in meters).
-        work_dir: Working directory for processing.
-        dem_path: Path to the DEM to use for processing. If None, the NISAR DEM will be downloaded.
-        apply_rtc: If True perform radiometric correction; if False, only geocode.
-    """
-    input_dir, output_dir = prep_dirs(work_dir)
-    slc = get_slc(platform, granule, input_dir)
-    
-    if dem_path is None:
-        dem_path = input_dir / 'dem.tif'
-        dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
-    dem.validate_dem(dem_path, slc.footprint)
-    geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path)
-    if slc.supports_rtc:
-        opts = RtcOptions(
-            dem_path=str(dem_path),
-            output_dir=str(output_dir),
-            apply_rtc=apply_rtc,
-            resolution=resolution,
-            apply_bistatic_delay=slc.supports_bistatic_delay,
-            apply_static_tropo=slc.supports_static_tropo,
-        )
-        rtc(slc, geogrid, opts)
-    else:
-        raise NotImplementedError(
-            'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
-            'https://github.com/forrestfwilliams/MultiRTC/pkgs/container/multirtc'
-        )
-'''
-
-
 def run_multirtc(
     platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path, apply_rtc: bool = True
 ) -> None:
@@ -140,6 +101,13 @@ def run_multirtc(
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
     slc = get_slc(platform, granule, input_dir)
+
+    if bbox and isinstance(slc, SicdPfaSlc):
+        rowcolbox = slc.bbox2rowcolbox(bbox)
+        tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
+        dem2.clip_sicd_file(input_dir / granule, rowcolbox, input_dir / tmp_granule)
+        slc = None
+        slc = get_slc(platform, tmp_granule, input_dir)
 
     poly = slc.footprint
 

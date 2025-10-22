@@ -24,6 +24,8 @@ from rasterio.transform import Affine
 from rasterio.mask import mask
 from shapely.geometry import shape, LinearRing, Polygon, box
 import pystac_client
+from sarpy.io.complex.converter import conversion_utility
+from sarpy.utils.chip_sicd import create_chip
 
 from multirtc import dem
 
@@ -104,6 +106,18 @@ def readgeojsonfile(geojsonfile):
             polys = shapely.geometry.MultiPolygon(lst)
 
     return polys
+
+
+def write_polygon(poly: Polygon, file: str):
+    poly_gdf = gpd.GeoDataFrame(index=[0], crs='epsg:4326', geometry=[poly])
+    poly_gdf.set_crs(f'epsg:{epsg_code}')
+    poly_gdf.to_file(file, driver="GeoJSON")
+
+
+def read_polygon(geojsonfile):
+    # geojson file only include one raw, its geometry is a Polygon
+    gdf = gpd.read_file(geojsonfile)
+    return gdf.loc[0, 'geometry']
 
 
 def get_geodata_meta(geodata_geojson):
@@ -695,6 +709,36 @@ def resample_to_3m(dem_in, dem_out):
         targetAlignedPixels=False,
     )
     gdal.Warp(dem_out, dem_in, options=options)
+
+
+def clip_sicd_file(sicdfile, rowcolbox: tuple, outfile):
+    """ subset the sicd file based on the rowcolbox (min_row, max_row, min_col, max_col)
+    Parameters
+    ----------
+    sicdfile
+    rowcolbox
+    outfile
+
+    Returns
+    -------
+
+    """
+    output_directory = Path(outfile).parent
+    output_filename = Path(outfile).name
+
+    try:
+        # Use the create_chip utility to extract and save the subset
+        create_chip(
+            str(sicdfile),
+            str(output_directory),
+            str(output_filename),
+            row_limits =(rowcolbox[0], rowcolbox[1]),
+            col_limits = (rowcolbox[2], rowcolbox[3]),
+        )
+        print(f"Successfully created subset file: {outfile}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
