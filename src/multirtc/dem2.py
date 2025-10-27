@@ -22,7 +22,7 @@ import subprocess
 import rasterio
 from rasterio.transform import Affine
 from rasterio.mask import mask
-from shapely.geometry import shape, LinearRing, Polygon, box
+from shapely.geometry import shape, LinearRing, MultiPolygon, Polygon, box
 import pystac_client
 from sarpy.io.complex.converter import conversion_utility
 from sarpy.utils.chip_sicd import create_chip
@@ -108,16 +108,19 @@ def readgeojsonfile(geojsonfile):
     return polys
 
 
-def write_polygon(poly: Polygon, file: str):
-    poly_gdf = gpd.GeoDataFrame(index=[0], crs='epsg:4326', geometry=[poly])
-    poly_gdf.set_crs(f'epsg:{epsg_code}')
+def write_polygon(poly: Polygon, file: str, epsg: int = 4326):
+    poly_gdf = gpd.GeoDataFrame(index=[0], crs=f'epsg:{epsg}', geometry=[poly])
+    poly_gdf.set_crs(f'epsg:{epsg}')
     poly_gdf.to_file(file, driver="GeoJSON")
 
 
 def read_polygon(geojsonfile):
     # geojson file only include one raw, its geometry is a Polygon
     gdf = gpd.read_file(geojsonfile)
-    return gdf.loc[0, 'geometry']
+    poly = gdf.loc[0, 'geometry']
+    if isinstance(poly, MultiPolygon):
+        poly = list(poly.geoms)[0]
+    return poly
 
 
 def get_geodata_meta(geodata_geojson):
@@ -407,10 +410,18 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1,
     Arguments:
         poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
     """
+    if Path(output_raster).exists() and Path(output_raster).is_file():
+       Path(output_raster).unlink()
+
     if poly:
         gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
         src = rasterio.open(input_raster)
-        src_epsg = src.profile['crs'].to_epsg()
+        crs = CRS.from_wkt(src.profile['crs'].to_wkt())
+        if crs.is_compound:
+            src_epsg = crs.to_2d().to_epsg()
+        else:
+            src_epsg = src.profile['crs'].to_epsg()
+
         gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
 
         poly = gdf_src.iloc[0]
@@ -655,7 +666,7 @@ def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
     col_coreg, row_coreg = geo_to_pixel(gt_coreg, gt[0], gt[3])
     data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()
     data_coreg[row_coreg : ysize + row_coreg, col_coreg : xsize + col_coreg][mask != 0] = data[mask != 0]
-
+    # add something to make sure the data_coreg does not include any in valide data
     # write to a new file out_dem
     driver = gdal.GetDriverByName('GTiff')
     ds_out = driver.Create(out_dem, xsize_coreg, ysize_coreg, 1, gdal.GDT_Float32)
@@ -711,46 +722,21 @@ def resample_to_3m(dem_in, dem_out):
     gdal.Warp(dem_out, dem_in, options=options)
 
 
-def clip_sicd_file(sicdfile, rowcolbox: tuple, outfile):
-    """ subset the sicd file based on the rowcolbox (min_row, max_row, min_col, max_col)
+def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
+    """ extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
+
     Parameters
     ----------
-    sicdfile
-    rowcolbox
-    outfile
+    lidar_dem_orig: original lidar
+    dem_path: output dem file
+    slcpoly: polygon used to defined the extent of the output dem file
 
     Returns
     -------
 
     """
-    output_directory = Path(outfile).parent
-    output_filename = Path(outfile).name
-
-    try:
-        # Use the create_chip utility to extract and save the subset
-        create_chip(
-            str(sicdfile),
-            str(output_directory),
-            str(output_filename),
-            row_limits =(rowcolbox[0], rowcolbox[1]),
-            col_limits = (rowcolbox[2], rowcolbox[3]),
-        )
-        print(f"Successfully created subset file: {outfile}")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
-    # lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
-
-    # lidar_dem_orig = "/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_pdal.tif"
 
     dem_path = Path(dem_path)
-
-    if dem_path.exists():
-        return dem_path
-
     input_path = dem_path.parent
     lidar_dem = input_path.joinpath(Path(lidar_dem_orig).stem + '_tmp.tif')
     shutil.copy(lidar_dem_orig, lidar_dem)
@@ -767,25 +753,38 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     poly84 = box(*poly84.bounds)
     ds = None
 
+    # use envelope of poly84 and slcpoly to determine download file
+    envelope = box(*MultiPolygon([poly84, slcpoly]).bounds).buffer(0.01)
+
     tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
     if tmp_dem_30m.exists():
         os.remove(tmp_dem_30m)
-    dem.download_opera_dem_for_footprint(tmp_dem_30m, poly84)
+    dem.download_opera_dem_for_footprint(tmp_dem_30m, envelope)
 
+    # clip with envelope
     tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
+    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=envelope)
 
-    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=slcpoly)
-
+    # fill the lidar data to tmp_dem_30m_clipped
     dem_filled = extend_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m_clipped)
 
+    # clip dem_filled with envelope
+    dem_filled_envelope = dem_filled.parent / f'{dem_filled.stem}_envelope.tif'
+    clip_raster_by_poly(dem_filled, dem_filled_envelope, bandnum=1, poly=envelope)
+
     # resample to 3m
-    # resample_to_3m(dem_filled, dem_path)
+    resample_to_3m(dem_filled_envelope, dem_path)
     # os.rename(dem_filled, dem_path)
-    shutil.copy(dem_filled, dem_path)
+    # shutil.copy(dem_filled_envelope, dem_path)
+
     # convert to wgs84
     reproject_to_4326(dem_path)
     # since majority Lidar height data is based on ellipsoid, no need to do conversion
     # convert_to_ellipsoid_based_height(dem_path)
+
+    # set 0 as nodata
+    set_nodata(dem_path)
+
     return dem_path
 
 

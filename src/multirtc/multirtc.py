@@ -20,10 +20,9 @@ from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
-
+from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE', 'CAPELLASP']
-
 
 def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     """Prepare input and output directories for processing.
@@ -80,7 +79,7 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
-    platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path, apply_rtc: bool = True
+    platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str, work_dir: Path, apply_rtc: bool = True
 ) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
@@ -100,14 +99,12 @@ def run_multirtc(
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
-    slc = get_slc(platform, granule, input_dir)
-
-    if bbox and isinstance(slc, SicdPfaSlc):
-        rowcolbox = slc.bbox2rowcolbox(bbox)
+    if bbox:
         tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
-        dem2.clip_sicd_file(input_dir / granule, rowcolbox, input_dir / tmp_granule)
-        slc = None
+        subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
         slc = get_slc(platform, tmp_granule, input_dir)
+    else:
+        slc = get_slc(platform, granule, input_dir)
 
     poly = slc.footprint
 
@@ -120,10 +117,14 @@ def run_multirtc(
     elif demtype == 'ArcticDEM 2m':
         dem_path = input_dir / 'dem_2d0.tif'
         dem2.download_2m_arcticdem(dem_path, poly)
-    else:
+    elif demtype == 'Lidar 0.5m':
         dem_path = input_dir / 'dem_0d5.tif'
-        lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
-        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly.buffer(0.5))
+        # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
+        lidar_dem_orig = demfile
+        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly)
+    else:
+        print("demtype is not correct. exit 1")
+        exit(1)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
 
@@ -182,6 +183,7 @@ def main():
     parser.add_argument(
         '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)'
     )
+    parser.add_argument('--dem', type=Path, default=None, help='demfile')
     parser.add_argument(
         '--demtype',
         choices=['Copernicus 30m', 'Geodata 3m', 'ArcticDEM 2m', 'Lidar 0.5m'],
@@ -195,7 +197,7 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir, args.rtc)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc)
 
 
 if __name__ == '__main__':
