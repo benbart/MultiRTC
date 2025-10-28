@@ -647,11 +647,17 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
 
 
 def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
-    coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
-    coregister(other_dem, lidar_dem, coregfile)
 
-    out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
-    ds = gdal.Open(lidar_dem)
+    # convert lidar_dem to lidar_dem_84
+    lidar_dem_84 = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_84.tif')
+    gdal.Warp(lidar_dem_84, lidar_dem, dstSRS='EPSG:4326', resampleAlg='cubic')
+
+    # coregister other_dem to lidar_dem_84
+    coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
+    coregister(other_dem, lidar_dem_84, coregfile)
+
+    out_dem = Path(lidar_dem_84).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
+    ds = gdal.Open(lidar_dem_84)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
     nodata = band.GetNoDataValue()
@@ -707,7 +713,7 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
 
 
 def resample_to_3m(dem_in, dem_out):
-    # resample dem_out to 3m
+    # resample dem_out to 3m here dem_in is in UTM coordinates
     ds_dem_in = gdal.Open(dem_in)
     proj_dem_in = ds_dem_in.GetProjectionRef()
     options = gdal.WarpOptions(
@@ -765,25 +771,20 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
     clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=envelope)
 
-    # fill the lidar data to tmp_dem_30m_clipped
+    # fill the lidar data to tmp_dem_30m_clipped, the output dem_filled is in WGS84 coordinates
     dem_filled = extend_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m_clipped)
 
     # clip dem_filled with envelope
     dem_filled_envelope = dem_filled.parent / f'{dem_filled.stem}_envelope.tif'
     clip_raster_by_poly(dem_filled, dem_filled_envelope, bandnum=1, poly=envelope)
 
-    # resample to 3m
-    resample_to_3m(dem_filled_envelope, dem_path)
-    # os.rename(dem_filled, dem_path)
-    # shutil.copy(dem_filled_envelope, dem_path)
+    # delete dem_path and f'{dem_path}.aux.xml' files
+    if dem_path.exists():
+        dem_path.unlink()
+    if dem_path.joinpath('.aux.xml').exists():
+       dem_path.joinpath('.aux.xml').unlink()
 
-    # convert to wgs84
-    reproject_to_4326(dem_path)
-    # since majority Lidar height data is based on ellipsoid, no need to do conversion
-    # convert_to_ellipsoid_based_height(dem_path)
-
-    # set 0 as nodata
-    set_nodata(dem_path)
+    shutil.copy(dem_filled_envelope, dem_path)
 
     return dem_path
 
