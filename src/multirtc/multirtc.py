@@ -79,8 +79,8 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
-    platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str, work_dir: Path, apply_rtc: bool = True
-) -> None:
+    platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str,
+        work_dir: Path, apply_rtc: bool = True, lidar_upscale_res=0.5) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -121,7 +121,7 @@ def run_multirtc(
         dem_path = input_dir / 'dem_0d5.tif'
         # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
         lidar_dem_orig = demfile
-        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly)
+        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, res=lidar_upscale_res)
     else:
         print("demtype is not correct. exit 1")
         exit(1)
@@ -192,12 +192,13 @@ def main():
     )
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     parser.add_argument('--rtc', type=bool, default=True, help='create RTC or geocode only product')
+    parser.add_argument('--lidar_upscale_res', type=float, default=0.5, help='choose upscale res for lidar dem')
     args = parser.parse_args()
 
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc, args.lidar_upscale_res)
 
 
 if __name__ == '__main__':

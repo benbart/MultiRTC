@@ -1,3 +1,5 @@
+from typing import Any
+
 import os
 import sys
 from collections.abc import Generator
@@ -647,7 +649,7 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
 
 
 def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
-
+    # lidar_dem is in coordinates other than wgs84, other_dem is in wgs84
     # convert lidar_dem to lidar_dem_84
     lidar_dem_84 = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_84.tif')
     gdal.Warp(lidar_dem_84, lidar_dem, dstSRS='EPSG:4326', resampleAlg='cubic')
@@ -712,23 +714,23 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     convert_to_ellipsoid_based_height(Path(outfile))
 
 
-def resample_to_3m(dem_in, dem_out):
-    # resample dem_out to 3m here dem_in is in UTM coordinates
+def resample_to_res(dem_in: str, dem_out: str, res=3.0) -> Any:
+    # resample dem_in to 3m dem_out, here dem_in is in UTM coordinates
     ds_dem_in = gdal.Open(dem_in)
     proj_dem_in = ds_dem_in.GetProjectionRef()
     options = gdal.WarpOptions(
         format='GTiff',
         srcSRS=proj_dem_in,
         dstSRS=proj_dem_in,
-        xRes=3.0,
-        yRes=3.0,
+        xRes=res,
+        yRes=res,
         resampleAlg=gdal.GRA_Bilinear,
         targetAlignedPixels=False,
     )
     gdal.Warp(dem_out, dem_in, options=options)
 
 
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
+def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon, res=0.5):
     """ extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
 
     Parameters
@@ -743,6 +745,10 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     """
 
     dem_path = Path(dem_path)
+
+    if dem_path.exists():
+        dem_path.unlink()
+
     input_path = dem_path.parent
     lidar_dem = input_path.joinpath(Path(lidar_dem_orig).stem + '_tmp.tif')
     shutil.copy(lidar_dem_orig, lidar_dem)
@@ -771,8 +777,12 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
     clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=envelope)
 
+    # test purpose
+    lidar_dem_tmp = lidar_dem.parent.joinpath(lidar_dem.stem + '_tmp.tif')
+    resample_to_res(lidar_dem, lidar_dem_tmp, res = res)
+
     # fill the lidar data to tmp_dem_30m_clipped, the output dem_filled is in WGS84 coordinates
-    dem_filled = extend_lidar_dem_with_other_dem(lidar_dem, tmp_dem_30m_clipped)
+    dem_filled = extend_lidar_dem_with_other_dem(lidar_dem_tmp, tmp_dem_30m_clipped)
 
     # clip dem_filled with envelope
     dem_filled_envelope = dem_filled.parent / f'{dem_filled.stem}_envelope.tif'
