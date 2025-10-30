@@ -170,6 +170,15 @@ def run(args):
     run_multirtc(args.platform, args.granule, args.resolution, args.work_dir, apply_rtc=True)
 
 
+def str2bool(v):
+    if v.lower() in ('True', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('False', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def main():
     """Create a RTC or geocoded dataset for a multiple satellite platforms
 
@@ -191,7 +200,7 @@ def main():
         help='Choose the DEM type, default is Copernicus 30m',
     )
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
-    parser.add_argument('--rtc', type=bool, default=True, help='create RTC or geocode only product')
+    parser.add_argument('--rtc', type=str2bool, default=True, help='create RTC or geocode only product')
     parser.add_argument('--lidar_upscale_res', type=float, default=0.5, help='choose upscale res for lidar dem')
     args = parser.parse_args()
 
