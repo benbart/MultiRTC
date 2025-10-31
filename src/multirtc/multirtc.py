@@ -22,7 +22,7 @@ from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 from multirtc.preprocess import subset_sicdfile
 
-SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE', 'CAPELLASP']
+SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
 
 def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     """Prepare input and output directories for processing.
@@ -65,7 +65,11 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
         safe_path = burst2safe(granules=[granule], all_anns=True, work_dir=input_dir)
         orbit_path = Path(retrieve_orbit_file(safe_path.name, str(input_dir), concatenate=True))
         slc = S1BurstSlc(safe_path, orbit_path, granule)
-    elif platform in ['CAPELLA', 'ICEYE', 'UMBRA', 'CAPELLASP']:
+    elif platform in ['CAPELLA', 'ICEYE', 'UMBRA']:
+
+        if platform == 'CAPELLA' and '_SP_' in granule:
+            platform = 'CAPELLASP'
+
         sicd_class = {'CAPELLA': SicdRzdSlc, 'ICEYE': SicdRzdSlc, 'UMBRA': SicdPfaSlc, 'CAPELLASP': SicdPfaSlc}[
             platform
         ]
