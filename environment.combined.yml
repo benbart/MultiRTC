@@ -3,11 +3,36 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  # For running
-  - python==3.13.5
-  - pip
-  - gdal>=3.0
+  # For building
+  # build
+  - cxx-compiler
+  - make
+  - cmake>=3.23
+  - ninja
+  - pybind11
+  - python==3.11.5
   - numpy>=1.20
+  # host
+  - eigen
+  - fftw
+  - gdal>=3.0
+  - gmock
+  - gtest
+  - hdf5
+  - libgdal-core
+  - libgdal-hdf5
+  - libgdal-netcdf
+  - pysolid
+  - pyre>=1.12.1,<=1.13.0
+  # needed for ctests in build.sh
+  - h5py
+  - pytest
+  - ruamel.yaml
+  - scipy
+  - shapely
+  - yamale
+  # For running
+  - pip
   - isce3
   - boto3
   - requests
@@ -20,6 +45,7 @@ dependencies:
   - tqdm
   - requests
   - urllib3
+  - hyp3lib
   - geojson
   - geopandas
   - rasterio
