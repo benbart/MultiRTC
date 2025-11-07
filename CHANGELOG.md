@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [PEP 440](https://www.python.org/dev/peps/pep-0440/)
 and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.5.3]
+
+### Fixed
+* modify the Dockerfile to merge the compile isce3 and multirtc in one conda env.
+
 ## [0.5.2]
 
 ### Fixed
@@ -40,6 +46,7 @@ and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 * Utilities for assessing absolute/relative location error, and point target characteristics of output products.
+
 ## [0.3.3]
 
 ### Changed

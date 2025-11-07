@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-=======
-from typing import Any
-
->>>>>>> arctraffic_pfa_0d5d2
 import os
 import sys
 from collections.abc import Generator
@@ -17,13 +12,8 @@ from pyproj import CRS
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_Update
 import numpy as np
-<<<<<<< HEAD
-from hyp3lib import DemError
-from hyp3lib.util import GDALConfigManager
-=======
 # from hyp3lib import DemError
 # from hyp3lib.util import GDALConfigManager
->>>>>>> arctraffic_pfa_0d5d2
 import shapely.geometry
 import geojson
 import json
@@ -32,15 +22,8 @@ import subprocess
 import rasterio
 from rasterio.transform import Affine
 from rasterio.mask import mask
-<<<<<<< HEAD
 from shapely.geometry import LinearRing, Polygon, box
 import pystac_client
-=======
-from shapely.geometry import shape, LinearRing, MultiPolygon, Polygon, box
-import pystac_client
-from sarpy.io.complex.converter import conversion_utility
-from sarpy.utils.chip_sicd import create_chip
->>>>>>> arctraffic_pfa_0d5d2
 
 from multirtc import dem
 
@@ -123,24 +106,6 @@ def readgeojsonfile(geojsonfile):
     return polys
 
 
-<<<<<<< HEAD
-=======
-def write_polygon(poly: Polygon, file: str, epsg: int = 4326):
-    poly_gdf = gpd.GeoDataFrame(index=[0], crs=f'epsg:{epsg}', geometry=[poly])
-    poly_gdf.set_crs(f'epsg:{epsg}')
-    poly_gdf.to_file(file, driver="GeoJSON")
-
-
-def read_polygon(geojsonfile):
-    # geojson file only include one raw, its geometry is a Polygon
-    gdf = gpd.read_file(geojsonfile)
-    poly = gdf.loc[0, 'geometry']
-    if isinstance(poly, MultiPolygon):
-        poly = list(poly.geoms)[0]
-    return poly
-
-
->>>>>>> arctraffic_pfa_0d5d2
 def get_geodata_meta(geodata_geojson):
     "s3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_6N.geojson"
     path_str = geodata_geojson.split('s3://')[1]
@@ -191,16 +156,6 @@ def download_geodata_cooperative_dem_for_footprint(
 
     with TemporaryDirectory() as temp_dir:
         session = boto3.Session(profile_name='arctic-traffic')
-<<<<<<< HEAD
-=======
-        # AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-        # AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-        # session = boto3.Session(
-        #    aws_access_key_id=AWS_ACCESS_KEY_ID,
-        #    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        #    region_name='us-east-2'  # Optional: specify your desired region
-        # )
->>>>>>> arctraffic_pfa_0d5d2
         client = session.client('s3')
         bucket_name = 'arctic-trafficability'
         input_files = []
@@ -238,11 +193,7 @@ def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str)
 
     Args:
         input_dem: file name of the raster
-<<<<<<< HEAD
         polygon: shapely.geometry.Polygon
-=======
-        polygon: shapely.geometry.Polygon, the same crs as the input_dem
->>>>>>> arctraffic_pfa_0d5d2
         output_dem: filename of the clipped raster
 
     Returns:
@@ -259,95 +210,6 @@ def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str)
         dest.write(out_image)
 
 
-<<<<<<< HEAD
-=======
-def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str, nodata: float = 0):
-    """clip a raster with a polygon defined in wgs84 (longitude and latitude)
-
-    Args:
-        input_dem: file name of the raster
-        polygon: shapely.geometry.Polygon, in WGS84 crs
-        nodata: nodata value
-        output_dem: filename of the clipped raster
-
-    Returns:
-
-    """
-    with rasterio.open(input_dem) as src:
-        gdf84 = gpd.GeoSeries([polygon], crs=f'EPSG:4326')
-        src_epsg = src.profile['crs'].to_epsg()
-        gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
-        polygon_src = gdf_src.iloc[0]
-        out_image, out_transform = mask(src, [polygon_src], crop=True)
-        out_meta = src.meta.copy()
-        out_meta.update(
-            {'driver': 'GTiff',
-             'height': out_image.shape[1],
-             'width': out_image.shape[2],
-             'transform': out_transform,
-             'nodata': nodata}
-        )
-
-    with rasterio.open(output_dem, 'w', **out_meta) as dest:
-        dest.write(out_image)
-
-
-def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
-    """
-    Converts a linear-scale raster to decibel (dB) scale.
-
-    Args:
-        input_path (str): Path to the input linear-scale GeoTIFF file.
-        output_path (str): Path to the output dB-scale GeoTIFF file.
-        ref (float): The reference value for the dB conversion (default is 1.0).
-        nodata (any, optional): The NoData value for the input raster.
-                                If None, the source's NoData value is used.
-    """
-    with rasterio.open(input_path) as src:
-        # Read the data as a numpy array
-        linear_data = src.read(1).astype(np.float32)  # Ensure float data type for math
-
-        # Get metadata for the output file
-        profile = src.profile
-
-        # Use source nodata if not provided
-        if nodata is None:
-            nodata = src.nodata
-
-    # Handle NoData values
-    if nodata is not None:
-        # Create a mask for NoData values
-        mask = (linear_data == nodata)
-        # Set nodata values to a safe value (e.g., NaN) before log operation
-        linear_data[mask] = np.nan
-
-    # Apply the dB conversion formula
-    # Use np.maximum to prevent log of zero or negative values (if not handled by nodata)
-    # The librosa library uses a small 'amin' value (e.g., 1e-10) for numerical stability if needed
-    linear_data = np.maximum(linear_data, 1e-10)  # Clamp values to avoid issues
-    db_data = 10 * np.log10(linear_data / ref)
-
-    # Set the nodata values in the new array back to the specified nodata value
-    if nodata is not None:
-        # Replace NaN with the nodata value if it was set
-        if np.isnan(nodata):
-            pass  # NaN values are already masked correctly in a masked array concept
-        else:
-            db_data[np.isnan(db_data)] = nodata
-
-    # Update the profile for the output raster
-    profile.update(
-        dtype=np.float32,  # dB data should be float
-        nodata=nodata,
-        compress='lzw'  # Optional: add compression
-    )
-
-    # Write the dB data to a new GeoTIFF file
-    with rasterio.open(output_path, 'w', **profile) as dst:
-        dst.write(db_data, 1)
-
-
->>>>>>> arctraffic_pfa_0d5d2
 def padding_dem(input_dem: str, output_dem: str, pad_pixels: list):
     """
     pad nodata to the input_dem. The padding area is determined by the buffer length with the same unit
@@ -438,25 +300,10 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1,
     Arguments:
         poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
     """
-<<<<<<< HEAD
     if poly:
         gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
         src = rasterio.open(input_raster)
         src_epsg = src.profile['crs'].to_epsg()
-=======
-    if Path(output_raster).exists() and Path(output_raster).is_file():
-       Path(output_raster).unlink()
-
-    if poly:
-        gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
-        src = rasterio.open(input_raster)
-        crs = CRS.from_wkt(src.profile['crs'].to_wkt())
-        if crs.is_compound:
-            src_epsg = crs.to_2d().to_epsg()
-        else:
-            src_epsg = src.profile['crs'].to_epsg()
-
->>>>>>> arctraffic_pfa_0d5d2
         gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
 
         poly = gdf_src.iloc[0]
@@ -682,25 +529,11 @@ def fill_lidar_dem_with_other_dem(lidar_dem, other_dem):
 
 
 def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
-<<<<<<< HEAD
     coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
     coregister(other_dem, lidar_dem, coregfile)
 
     out_dem = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
     ds = gdal.Open(lidar_dem)
-=======
-    # lidar_dem is in coordinates other than wgs84, other_dem is in wgs84
-    # convert lidar_dem to lidar_dem_84
-    lidar_dem_84 = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_84.tif')
-    gdal.Warp(lidar_dem_84, lidar_dem, dstSRS='EPSG:4326', resampleAlg='cubic')
-
-    # coregister other_dem to lidar_dem_84
-    coregfile = Path(lidar_dem).parent.joinpath(Path(lidar_dem).stem + '_coreg.tif')
-    coregister(other_dem, lidar_dem_84, coregfile)
-
-    out_dem = Path(lidar_dem_84).parent.joinpath(Path(lidar_dem).stem + '_coreg_fill.tif')
-    ds = gdal.Open(lidar_dem_84)
->>>>>>> arctraffic_pfa_0d5d2
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
     nodata = band.GetNoDataValue()
@@ -715,11 +548,7 @@ def extend_lidar_dem_with_other_dem(lidar_dem, other_dem):
     col_coreg, row_coreg = geo_to_pixel(gt_coreg, gt[0], gt[3])
     data_coreg = ds_coreg.GetRasterBand(1).ReadAsArray()
     data_coreg[row_coreg : ysize + row_coreg, col_coreg : xsize + col_coreg][mask != 0] = data[mask != 0]
-<<<<<<< HEAD
 
-=======
-    # add something to make sure the data_coreg does not include any in valide data
->>>>>>> arctraffic_pfa_0d5d2
     # write to a new file out_dem
     driver = gdal.GetDriverByName('GTiff')
     ds_out = driver.Create(out_dem, xsize_coreg, ysize_coreg, 1, gdal.GDT_Float32)
@@ -759,61 +588,31 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     convert_to_ellipsoid_based_height(Path(outfile))
 
 
-<<<<<<< HEAD
 def resample_to_3m(dem_in, dem_out):
     # resample dem_out to 3m
-=======
-def resample_to_res(dem_in: str, dem_out: str, res=3.0) -> Any:
-    # resample dem_in to 3m dem_out, here dem_in is in UTM coordinates
->>>>>>> arctraffic_pfa_0d5d2
     ds_dem_in = gdal.Open(dem_in)
     proj_dem_in = ds_dem_in.GetProjectionRef()
     options = gdal.WarpOptions(
         format='GTiff',
         srcSRS=proj_dem_in,
         dstSRS=proj_dem_in,
-<<<<<<< HEAD
         xRes=3.0,
         yRes=3.0,
-=======
-        xRes=res,
-        yRes=res,
->>>>>>> arctraffic_pfa_0d5d2
         resampleAlg=gdal.GRA_Bilinear,
         targetAlignedPixels=False,
     )
     gdal.Warp(dem_out, dem_in, options=options)
 
 
-<<<<<<< HEAD
 def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon):
     # lidar_dem_orig = "/media/jiangzhu/Elements/crrel/sar_data/dem/poker_20250226_05_mean.tif"
 
     # lidar_dem_orig = "/media/jiangzhu/data1/crrel/iceye/iceye_20250326_uaf/work/input/20250523-1602_uaf_full_cloud_dem_pdal.tif"
-=======
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon, res=0.5):
-    """ extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
-
-    Parameters
-    ----------
-    lidar_dem_orig: original lidar
-    dem_path: output dem file
-    slcpoly: polygon used to defined the extent of the output dem file
-
-    Returns
-    -------
-
-    """
->>>>>>> arctraffic_pfa_0d5d2
 
     dem_path = Path(dem_path)
 
     if dem_path.exists():
-<<<<<<< HEAD
         return dem_path
-=======
-        dem_path.unlink()
->>>>>>> arctraffic_pfa_0d5d2
 
     input_path = dem_path.parent
     lidar_dem = input_path.joinpath(Path(lidar_dem_orig).stem + '_tmp.tif')
@@ -831,7 +630,6 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     poly84 = box(*poly84.bounds)
     ds = None
 
-<<<<<<< HEAD
     tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
     if tmp_dem_30m.exists():
         os.remove(tmp_dem_30m)
@@ -851,39 +649,6 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     reproject_to_4326(dem_path)
     # since majority Lidar height data is based on ellipsoid, no need to do conversion
     # convert_to_ellipsoid_based_height(dem_path)
-=======
-    # use envelope of poly84 and slcpoly to determine download file
-    envelope = box(*MultiPolygon([poly84, slcpoly]).bounds).buffer(0.01)
-
-    tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
-    if tmp_dem_30m.exists():
-        os.remove(tmp_dem_30m)
-    dem.download_opera_dem_for_footprint(tmp_dem_30m, envelope)
-
-    # clip with envelope
-    tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
-    clip_raster_by_poly(tmp_dem_30m, tmp_dem_30m_clipped, bandnum=1, poly=envelope)
-
-    # test purpose
-    lidar_dem_tmp = lidar_dem.parent.joinpath(lidar_dem.stem + '_tmp.tif')
-    resample_to_res(lidar_dem, lidar_dem_tmp, res = res)
-
-    # fill the lidar data to tmp_dem_30m_clipped, the output dem_filled is in WGS84 coordinates
-    dem_filled = extend_lidar_dem_with_other_dem(lidar_dem_tmp, tmp_dem_30m_clipped)
-
-    # clip dem_filled with envelope
-    dem_filled_envelope = dem_filled.parent / f'{dem_filled.stem}_envelope.tif'
-    clip_raster_by_poly(dem_filled, dem_filled_envelope, bandnum=1, poly=envelope)
-
-    # delete dem_path and f'{dem_path}.aux.xml' files
-    if dem_path.exists():
-        dem_path.unlink()
-    if dem_path.joinpath('.aux.xml').exists():
-       dem_path.joinpath('.aux.xml').unlink()
-
-    shutil.copy(dem_filled_envelope, dem_path)
-
->>>>>>> arctraffic_pfa_0d5d2
     return dem_path
 
 
