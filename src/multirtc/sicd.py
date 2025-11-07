@@ -7,12 +7,8 @@ import pyproj
 from numpy.polynomial.polynomial import polyval2d
 from osgeo import gdal
 from sarpy.io.complex.sicd import SICDReader
-<<<<<<< HEAD
-from shapely.geometry import Point, Polygon
-=======
 from shapely.geometry import Point, Polygon, box
 import geopandas as gpd
->>>>>>> arctraffic_pfa_0d5d2
 
 from multirtc import define_geogrid
 from multirtc.base import Slc, print_wkt, to_isce_datetime
@@ -231,34 +227,18 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-<<<<<<< HEAD
-    # def create_geogrid(self, spacing_meters: int) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg)
 
-    # def create_geogrid(self, spacing_meters: int, dem_path: Path) -> isce3.product.GeoGridParameters:
-    #     return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
-
-    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
-                       ) -> isce3.product.GeoGridParameters:
-        if bbox:
-            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
-        else:
-            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
-=======
     def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
                        ) -> isce3.product.GeoGridParameters:
         # if bbox:
         #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
         # else:
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
->>>>>>> arctraffic_pfa_0d5d2
+
 
     def _print_wkt(self):
         return print_wkt(self)
 
-
-<<<<<<< HEAD
-=======
 
     def bbox2rowcolbox(self, bbox: list, direction: str = 'ul'):
         """
@@ -342,9 +322,6 @@ class SicdRzdSlc(Slc, SicdSlc):
         return (row0, row1, col0, col1)
 
 
-
-
->>>>>>> arctraffic_pfa_0d5d2
 class SicdPfaSlc(Slc, SicdSlc):
     """Class for SICD SLCs with PFA (Polar Format Algorithm) grids."""
 
@@ -457,13 +434,6 @@ class SicdPfaSlc(Slc, SicdSlc):
     def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
                        ) -> isce3.product.GeoGridParameters:
         """subset does not works for SicdPfaSlc, so even if user input bbox, does not do subset"""
-        # if bbox:
-<<<<<<< HEAD
-        #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
-=======
-        #    return define_geogrid.generate_geogrids_via_bbox2(self, spacing_meters, 4326, dem_path, bbox=bbox)
->>>>>>> arctraffic_pfa_0d5d2
-        # else:
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
     def calculate_range_range_rate_offset(self) -> np.ndarray:
@@ -579,10 +549,7 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-<<<<<<< HEAD
-    '''
-    def create_geogrid(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
-=======
+
     def bbox2rowcolbox(self, bbox: list):
         """
 
@@ -618,7 +585,6 @@ class SicdPfaSlc(Slc, SicdSlc):
 
 
     def create_geogrid2(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
->>>>>>> arctraffic_pfa_0d5d2
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
@@ -671,8 +637,3 @@ class SicdPfaSlc(Slc, SicdSlc):
         )
         geogrid_snapped = define_geogrid.snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
         return geogrid_snapped
-<<<<<<< HEAD
-        '''
-=======
-
->>>>>>> arctraffic_pfa_0d5d2

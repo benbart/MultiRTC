@@ -20,16 +20,11 @@ from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
-<<<<<<< HEAD
 
-
-SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE', 'CAPELLASP']
-
-=======
 from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
->>>>>>> arctraffic_pfa_0d5d2
+
 
 def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     """Prepare input and output directories for processing.
@@ -72,15 +67,10 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
         safe_path = burst2safe(granules=[granule], all_anns=True, work_dir=input_dir)
         orbit_path = Path(retrieve_orbit_file(safe_path.name, str(input_dir), concatenate=True))
         slc = S1BurstSlc(safe_path, orbit_path, granule)
-<<<<<<< HEAD
-    elif platform in ['CAPELLA', 'ICEYE', 'UMBRA', 'CAPELLASP']:
-=======
     elif platform in ['CAPELLA', 'ICEYE', 'UMBRA']:
-
         if platform == 'CAPELLA' and '_SP_' in granule:
             platform = 'CAPELLASP'
 
->>>>>>> arctraffic_pfa_0d5d2
         sicd_class = {'CAPELLA': SicdRzdSlc, 'ICEYE': SicdRzdSlc, 'UMBRA': SicdPfaSlc, 'CAPELLASP': SicdPfaSlc}[
             platform
         ]
@@ -93,54 +83,9 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
-<<<<<<< HEAD
-'''
-def run_multirtc(platform: str, granule: str, resolution: int, work_dir: Path, apply_rtc=True) -> None:
->>>>>>> jz_dev
-    """Create an RTC or Geocoded dataset using the OPERA algorithm.
-
-    Args:
-        platform: Platform type (e.g., 'UMBRA').
-        granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
-        resolution: Resolution of the output RTC (in meters).
-        work_dir: Working directory for processing.
-        dem_path: Path to the DEM to use for processing. If None, the NISAR DEM will be downloaded.
-        apply_rtc: If True perform radiometric correction; if False, only geocode.
-    """
-    input_dir, output_dir = prep_dirs(work_dir)
-    slc = get_slc(platform, granule, input_dir)
-    
-    if dem_path is None:
-        dem_path = input_dir / 'dem.tif'
-        dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
-    dem.validate_dem(dem_path, slc.footprint)
-    geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path)
-    if slc.supports_rtc:
-        opts = RtcOptions(
-            dem_path=str(dem_path),
-            output_dir=str(output_dir),
-            apply_rtc=apply_rtc,
-            resolution=resolution,
-            apply_bistatic_delay=slc.supports_bistatic_delay,
-            apply_static_tropo=slc.supports_static_tropo,
-        )
-        rtc(slc, geogrid, opts)
-    else:
-        raise NotImplementedError(
-            'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
-            'https://github.com/forrestfwilliams/MultiRTC/pkgs/container/multirtc'
-        )
-'''
-
-
-def run_multirtc(
-    platform: str, granule: str, resolution: float, bbox: list, demtype: str, work_dir: Path, apply_rtc: bool = True
-) -> None:
-=======
 def run_multirtc(
     platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str,
         work_dir: Path, apply_rtc: bool = True, lidar_upscale_res=0.5) -> None:
->>>>>>> arctraffic_pfa_0d5d2
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -159,16 +104,12 @@ def run_multirtc(
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
-<<<<<<< HEAD
-    slc = get_slc(platform, granule, input_dir)
-=======
     if bbox:
         tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
         subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
         slc = get_slc(platform, tmp_granule, input_dir)
     else:
         slc = get_slc(platform, granule, input_dir)
->>>>>>> arctraffic_pfa_0d5d2
 
     poly = slc.footprint
 
@@ -181,12 +122,6 @@ def run_multirtc(
     elif demtype == 'ArcticDEM 2m':
         dem_path = input_dir / 'dem_2d0.tif'
         dem2.download_2m_arcticdem(dem_path, poly)
-<<<<<<< HEAD
-    else:
-        dem_path = input_dir / 'dem_0d5.tif'
-        lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
-        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly.buffer(0.5))
-=======
     elif demtype == 'Lidar 0.5m':
         dem_path = input_dir / 'dem_0d5.tif'
         # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
@@ -195,7 +130,6 @@ def run_multirtc(
     else:
         print("demtype is not correct. exit 1")
         exit(1)
->>>>>>> arctraffic_pfa_0d5d2
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
 
@@ -209,8 +143,6 @@ def run_multirtc(
             apply_static_tropo=slc.supports_static_tropo,
         )
         rtc(slc, geogrid, opts)
-<<<<<<< HEAD
-=======
 
         rtcfile = output_dir / f'{slc.filepath.stem}.tif'
 
@@ -219,7 +151,6 @@ def run_multirtc(
             rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
             dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = 0)
             dem2.linear_to_db(rtcfile_clip, rtcfile_db)
->>>>>>> arctraffic_pfa_0d5d2
     else:
         raise NotImplementedError(
             'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
@@ -244,8 +175,6 @@ def run(args):
     run_multirtc(args.platform, args.granule, args.resolution, args.work_dir, apply_rtc=True)
 
 
-<<<<<<< HEAD
-=======
 def str2bool(v):
     if v.lower() in ('True', 'true', 't', 'y', '1'):
         return True
@@ -255,7 +184,6 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
->>>>>>> arctraffic_pfa_0d5d2
 def main():
     """Create a RTC or geocoded dataset for a multiple satellite platforms
 
@@ -269,10 +197,7 @@ def main():
     parser.add_argument(
         '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)'
     )
-<<<<<<< HEAD
-=======
     parser.add_argument('--dem', type=Path, default=None, help='demfile')
->>>>>>> arctraffic_pfa_0d5d2
     parser.add_argument(
         '--demtype',
         choices=['Copernicus 30m', 'Geodata 3m', 'ArcticDEM 2m', 'Lidar 0.5m'],
@@ -280,23 +205,15 @@ def main():
         help='Choose the DEM type, default is Copernicus 30m',
     )
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
-<<<<<<< HEAD
-    parser.add_argument('--rtc', type=bool, default=True, help='create RTC or geocode only product')
-=======
     parser.add_argument('--rtc', type=str2bool, default=True, help='create RTC or geocode only product')
     parser.add_argument('--lidar_upscale_res', type=float, default=0.5, help='choose upscale res for lidar dem')
->>>>>>> arctraffic_pfa_0d5d2
+
     args = parser.parse_args()
 
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-<<<<<<< HEAD
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.work_dir, args.rtc)
-=======
     run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc, args.lidar_upscale_res)
->>>>>>> arctraffic_pfa_0d5d2
-
 
 if __name__ == '__main__':
     main()

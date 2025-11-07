@@ -114,11 +114,7 @@ def main():
     parser.add_argument('--output', type=str, required=True, help='file name of the output dem file')
     parser.add_argument('--resolution', type=float, default=1.0, help='resolution of output dem file')
     args = parser.parse_args()
-<<<<<<< HEAD
-
-=======
     # example las file: 20250523-1602_uaf_full_cloud.laz
->>>>>>> arctraffic_pfa_0d5d2
     convert_las_2_dem(args.input, args.output, args.resolution)
     # fill_dem("/tmp/dem.tif", args.output)
 
