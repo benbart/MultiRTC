@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  # For building
+  # For building isce3
   # build
   - cxx-compiler
   - make
@@ -31,6 +31,7 @@ dependencies:
   - scipy
   - shapely
   - yamale
+  # For multirtc
   # For running
   - pip
   - isce3
@@ -45,7 +46,6 @@ dependencies:
   - tqdm
   - requests
   - urllib3
-  - hyp3lib
   - geojson
   - geopandas
   - rasterio

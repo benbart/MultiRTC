@@ -44,9 +44,8 @@ RUN mkdir -p ./isce3/isce3_build && \
     cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DCMAKE_INSTALL_PREFIX=/home/conda/isce3/isce3_install /home/conda/isce3/isce3_src && \
     make -j"$(nproc)" && \
     make install && \
-    cd ../..
-
-RUN rm -rf isce3/isce3_build isce3/isce3_src
+    cd ../.. && \
+    rm -rf isce3/isce3_build isce3/isce3_src
 
 ENV ISCE_INSTALL=/home/conda/isce3/isce3_install
 ENV PATH=$ISCE_INSTALL/bin:$ISCE_INSTALL/packages/nisar/workflows/:$PATH \

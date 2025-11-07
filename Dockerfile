@@ -1,4 +1,4 @@
-FROM condaforge/mambaforge:latest as builder
+FROM condaforge/mambaforge:latest AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=true
@@ -33,7 +33,7 @@ RUN mamba env create -f ./multirtc/environment.isce3.yml && \
     make install && \
     cd ../..
 
-FROM condaforge/mambaforge:latest as runner
+FROM condaforge/mambaforge:latest AS runner
 
 # For opencontainers label definitions, see:
 #    https://github.com/opencontainers/image-spec/blob/master/annotations.md

@@ -9,7 +9,7 @@ dependencies:
   - cmake>=3.23
   - ninja
   - pybind11
-  - python=3.13.5
+  - python
   - numpy
   # host
   - eigen
