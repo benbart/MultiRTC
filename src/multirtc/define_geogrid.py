@@ -254,8 +254,6 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped
-<<<<<<< HEAD
-=======
 
 
 def generate_geogrids_via_bbox2(slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list) -> isce3.product.GeoGridParameters:
@@ -300,4 +298,4 @@ def generate_geogrids_via_bbox2(slc, spacing_meters: float, epsg: int, dem_path:
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped
->>>>>>> arctraffic_pfa_0d5d2
+
