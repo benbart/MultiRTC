@@ -1,10 +1,4 @@
 #!/bin/bash --login
-<<<<<<< HEAD
-set -e
-conda activate multirtc
-exec python -um multirtc "$@"
-=======
-
 set -e
 
 conda activate multirtc
@@ -12,4 +6,4 @@ conda activate multirtc
 cd /home/conda/multirtc
 
 python src/multirtc/multirtc.py "$@"
->>>>>>> arctraffic_pfa_0d5d2
+
