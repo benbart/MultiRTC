@@ -4,6 +4,7 @@ import argparse
 
 import sys
 import glob
+
 sys.path.remove(sys.path[0])
 
 from shapely.geometry import Polygon, box
@@ -88,8 +89,16 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
-    platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str,
-        work_dir: Path, apply_rtc: bool = True, lidar_upscale_res=0.5) -> None:
+    platform: str,
+    granule: str,
+    resolution: float,
+    bbox: list,
+    demtype: str,
+    demfile: str,
+    work_dir: Path,
+    apply_rtc: bool = True,
+    lidar_upscale_res=0.5,
+) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -106,7 +115,6 @@ def run_multirtc(
 
     # convert ICEYE h5 to nitf
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
-
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
     # subset by sarpy does not work correctly, skip this subset of the sicd file
@@ -135,7 +143,7 @@ def run_multirtc(
         lidar_dem_orig = demfile
         dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, res=lidar_upscale_res)
     else:
-        print("demtype is not correct. exit 1")
+        print('demtype is not correct. exit 1')
         exit(1)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
@@ -156,7 +164,7 @@ def run_multirtc(
         if rtcfile.exists():
             rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
             rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
-            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = 0)
+            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata=0)
             dem2.linear_to_db(rtcfile_clip, rtcfile_db)
     else:
         raise NotImplementedError(
@@ -220,7 +228,18 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc, args.lidar_upscale_res)
+    run_multirtc(
+        args.platform,
+        args.granule,
+        args.resolution,
+        args.subset,
+        args.demtype,
+        args.dem,
+        args.work_dir,
+        args.rtc,
+        args.lidar_upscale_res,
+    )
+
 
 if __name__ == '__main__':
     main()

@@ -227,19 +227,17 @@ class SicdRzdSlc(Slc, SicdSlc):
         )
         return radar_grid
 
-
-    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
-                       ) -> isce3.product.GeoGridParameters:
+    def create_geogrid(
+        self, spacing_meters: float, dem_path: Path, bbox: list = None
+    ) -> isce3.product.GeoGridParameters:
         # subset works for range-zero-doppler format
         if bbox:
             return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
         else:
             return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
-
     def _print_wkt(self):
         return print_wkt(self)
-
 
     def bbox2rowcolbox(self, bbox: list, direction: str = 'ul'):
         """
@@ -279,30 +277,30 @@ class SicdRzdSlc(Slc, SicdSlc):
 
             return x0, y0, xres, yres, direction
 
-        #ll = pyproj.CRS(4326)  # WGS84 lat/lon/ellipsoid height
-        #utm= pyproj.CRS(self.local_epsg)
-        #ll2utm = pyproj.Transformer.from_crs(ll, utm, always_xy=True)
+        # ll = pyproj.CRS(4326)  # WGS84 lat/lon/ellipsoid height
+        # utm= pyproj.CRS(self.local_epsg)
+        # ll2utm = pyproj.Transformer.from_crs(ll, utm, always_xy=True)
 
         poly = box(*bbox)
         poly_dst = _convert_crs(poly, self.local_epsg)
 
-        #xx, yy = poly.exterior.coords.xy
-        #xx1 = np.array(xx)
-        #yy1 = np.array(yy)
-        #v = ll2utm.transform(xx1, yy1)
-        #v = np.vstack(v).T
-        #subboundary = (v[:,0].min(), v[:,1].min(), v[:,0].max(), v[:,1].max())
+        # xx, yy = poly.exterior.coords.xy
+        # xx1 = np.array(xx)
+        # yy1 = np.array(yy)
+        # v = ll2utm.transform(xx1, yy1)
+        # v = np.vstack(v).T
+        # subboundary = (v[:,0].min(), v[:,1].min(), v[:,0].max(), v[:,1].max())
 
         subboundary = poly_dst.bounds
 
         poly_all = self.footprint
 
-        #xx, yy = poly.exterior.coords.xy
-        #xx1 = np.array(xx)
-        #yy1 = np.array(yy)
-        #v = ll2utm.transform(xx1, yy1)
-        #v = np.vstack(v).T
-        #boundary = (v[:, 0].min(), v[:, 1].min(), v[:, 0].max(), v[:, 1].max())
+        # xx, yy = poly.exterior.coords.xy
+        # xx1 = np.array(xx)
+        # yy1 = np.array(yy)
+        # v = ll2utm.transform(xx1, yy1)
+        # v = np.vstack(v).T
+        # boundary = (v[:, 0].min(), v[:, 1].min(), v[:, 0].max(), v[:, 1].max())
 
         poly_all_dst = _convert_crs(poly_all, self.local_epsg)
         boundary = poly_all_dst.bounds
@@ -310,8 +308,8 @@ class SicdRzdSlc(Slc, SicdSlc):
         # 7026, 20958
 
         # ul is (0,0)
-        if direction  == 'ul':
-            x0, y0, xres, yres, direction = _getgeotransform(boundary, direction = 'ul')
+        if direction == 'ul':
+            x0, y0, xres, yres, direction = _getgeotransform(boundary, direction='ul')
             row0, col0 = _geos2rowcol(x0, y0, xres, yres, subboundary[0], subboundary[3])
             row1, col1 = _geos2rowcol(x0, y0, xres, yres, subboundary[2], subboundary[1])
         else:
@@ -432,8 +430,9 @@ class SicdPfaSlc(Slc, SicdSlc):
                 dopplers[i, j] = self.radar_grid.doppler(azimuths[i], ranges[j])
         return isce3.core.LUT2d(ranges, azimuths, dopplers)
 
-    def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
-                       ) -> isce3.product.GeoGridParameters:
+    def create_geogrid(
+        self, spacing_meters: float, dem_path: Path, bbox: list = None
+    ) -> isce3.product.GeoGridParameters:
         """subset does not work for PFA format, so even if user input bbox, does not do subset"""
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
@@ -550,7 +549,6 @@ class SicdPfaSlc(Slc, SicdSlc):
         row_col = rgaz.T.copy()
         return row_col
 
-
     def bbox2rowcolbox(self, bbox: list):
         """
 
@@ -574,18 +572,17 @@ class SicdPfaSlc(Slc, SicdSlc):
         yy1 = np.array(yy)
         zz1 = np.zeros_like(xx1)
         zz1[:] = self.scp_hae
-        v = lla2ecef.transform(xx1,yy1,zz1)
+        v = lla2ecef.transform(xx1, yy1, zz1)
         v = np.vstack(v).T
         rowcol = self.geo2rowcol(v)
 
-        rowcolbox = (int(rowcol[:,0].min()), int(rowcol[:,0].max()),
-                     int(rowcol[:,1].min()), int(rowcol[:,1].max()))
+        rowcolbox = (int(rowcol[:, 0].min()), int(rowcol[:, 0].max()), int(rowcol[:, 1].min()), int(rowcol[:, 1].max()))
 
         return rowcolbox
 
-
-
-    def create_geogrid2(self, spacing_meters: float, dem_path: Path = None, bbox: list = None) -> isce3.product.GeoGridParameters:
+    def create_geogrid2(
+        self, spacing_meters: float, dem_path: Path = None, bbox: list = None
+    ) -> isce3.product.GeoGridParameters:
         """Create a geogrid for the PFA SLC.
         Note: Unlike other Slc subclasses, the PFA geogrid is always defined in EPSG 4326 (Lat/Lon).
 
@@ -608,7 +605,7 @@ class SicdPfaSlc(Slc, SicdSlc):
         lla_point_shift = utm2lla.transform(*utm_point_shift)
         x_spacing = lla_point_shift[0] - lla_point[0]
 
-        utm_point_shift = (utm_point[0], utm_point[1]-spacing_meters)
+        utm_point_shift = (utm_point[0], utm_point[1] - spacing_meters)
         lla_point_shift = utm2lla.transform(*utm_point_shift)
         y_spacing = lla_point_shift[1] - lla_point[1]
 
@@ -620,7 +617,7 @@ class SicdPfaSlc(Slc, SicdSlc):
         else:
             points = np.array([(0, 0), (0, self.shape[1]), self.shape, (self.shape[0], 0)])
             geos = self.rowcol2geo(points, self.scp_hae)
-            
+
             points = np.vstack(ecef2lla.transform(geos[:, 0], geos[:, 1], geos[:, 2])).T
             minx, maxx = np.min(points[:, 0]), np.max(points[:, 0])
             miny, maxy = np.min(points[:, 1]), np.max(points[:, 1])

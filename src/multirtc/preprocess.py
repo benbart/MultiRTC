@@ -17,6 +17,7 @@ import pandas as pd
 import geopandas as gpd
 import copy
 
+
 def getrowcol(sicdfile, bbox):
     """
     sicdffile: sicd file
@@ -38,12 +39,14 @@ def getrowcol(sicdfile, bbox):
     # Example: a single point at (lon, lat, hae)
 
     hae = sicd_structure.GeoData.SCP.LLH.HAE
-    corners_geo = np.array([
-        [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
-        [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
-        [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
-        [bbox[1], bbox[0], hae]  # Bottom-Left (min_lat, min_lon)
-    ])
+    corners_geo = np.array(
+        [
+            [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
+            [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
+            [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
+            [bbox[1], bbox[0], hae],  # Bottom-Left (min_lat, min_lon)
+        ]
+    )
 
     # 4. Convert geographic coordinates to image pixel coordinates (Row, Col)
     corners_pixels = ground_to_image_geo(corners_geo, sicd_structure)
@@ -81,7 +84,7 @@ def getrowcol(sicdfile, bbox):
 
 
 def clip_sicd_file(sicdfile: str, rowcolbox: tuple, geo_coords, outfile: str):
-    """ subset the sicd file based on the rowcolbox (min_row, max_row, min_col, max_col)
+    """subset the sicd file based on the rowcolbox (min_row, max_row, min_col, max_col)
     Parameters
     ---------
     sicdfile: sicd file
@@ -99,13 +102,13 @@ def clip_sicd_file(sicdfile: str, rowcolbox: tuple, geo_coords, outfile: str):
 
     try:
         # Use the create_chip utility to extract and save the subset
-        #create_chip(
+        # create_chip(
         #    str(sicdfile),
         #    str(output_directory),
         #    str(output_filename),
         #    row_limits =(rowcolbox[0], rowcolbox[1]),
         #    col_limits = (rowcolbox[2], rowcolbox[3]),
-        #)
+        # )
 
         conversion_utility(
             str(sicdfile),
@@ -114,10 +117,11 @@ def clip_sicd_file(sicdfile: str, rowcolbox: tuple, geo_coords, outfile: str):
             row_limits=(rowcolbox[0], rowcolbox[1]),
             column_limits=(rowcolbox[2], rowcolbox[3]),
         )
-        print(f"Successfully created subset file: {outfile}")
+        print(f'Successfully created subset file: {outfile}')
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f'An error occurred: {e}')
+
 
 def imagecorners(scidfile):
     reader = SICDReader(file)
@@ -134,15 +138,18 @@ def imagecorners(scidfile):
     lrlc1 = point_projection.ground_to_image_geo((float(lrlc[0]), float(lrlc[1]), 0.0), meta, ordering='longlat')
     lrfc1 = point_projection.ground_to_image_geo((float(lrfc[0]), float(lrfc[1]), 0.0), meta, ordering='longlat')
 
-    point_data = {'name':[ 'frfc', 'frlc','lrlc','lrfc'], 'geometry': [Point(frfc),Point(frlc),Point(lrlc),  Point(lrfc)] }
+    point_data = {
+        'name': ['frfc', 'frlc', 'lrlc', 'lrfc'],
+        'geometry': [Point(frfc), Point(frlc), Point(lrlc), Point(lrfc)],
+    }
 
     df = pd.DataFrame(point_data)
 
     # 3. Convert the pandas DataFrame to a GeoDataFrame
     # The 'geometry' column is automatically recognized as the active geometry
     gdf = gpd.GeoDataFrame(df)
-    gdf = gdf.set_crs("EPSG:4326")
-    gdf.to_file(output_filename, driver="GeoJSON")
+    gdf = gdf.set_crs('EPSG:4326')
+    gdf.to_file(output_filename, driver='GeoJSON')
 
 
 def subset_sicdfile_3(input_file, bbox, output_file):
@@ -160,14 +167,15 @@ def subset_sicdfile_3(input_file, bbox, output_file):
     assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
     hae = sicd_structure.GeoData.SCP.LLH.HAE
 
-
     # 3. Define the four corners of the geographic box in Sarpy format (Lat, Lon, HAE)
-    corners_geo = np.array([
-        [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
-        [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
-        [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
-        [bbox[1], bbox[0], hae]   # Bottom-Left (min_lat, min_lon)
-    ])
+    corners_geo = np.array(
+        [
+            [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
+            [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
+            [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
+            [bbox[1], bbox[0], hae],  # Bottom-Left (min_lat, min_lon)
+        ]
+    )
 
     # 4. Convert geographic coordinates to image pixel coordinates (Row, Col)
     corners_pixels = ground_to_image_geo(corners_geo, sicd_structure)
@@ -187,7 +195,7 @@ def subset_sicdfile_3(input_file, bbox, output_file):
     max_col = min(img_cols, max_col)
 
     pixel_bounds = (min_row, max_row, min_col, max_col)
-    print(f"Calculated pixel bounds for create_chip: {pixel_bounds}")
+    print(f'Calculated pixel bounds for create_chip: {pixel_bounds}')
 
     # 6. Call create_chip using the derived pixel bounds
 
@@ -197,7 +205,7 @@ def subset_sicdfile_3(input_file, bbox, output_file):
     output_dir = str(Path(output_file).parent)
     output_file_name = str(Path(output_file).name)
 
-    '''
+    """
     create_chip(
         input_file,
         output_dir,
@@ -205,17 +213,17 @@ def subset_sicdfile_3(input_file, bbox, output_file):
         row_limits=(min_row, max_row),
         col_limits=(min_col, max_col)
     )
-    '''
+    """
 
     conversion_utility(
-            str(input_file),
-            str(output_dir),
-            str(output_file_name),
-            row_limits=(min_row, max_row),
-            column_limits=(min_col, max_col)
-        )
+        str(input_file),
+        str(output_dir),
+        str(output_file_name),
+        row_limits=(min_row, max_row),
+        column_limits=(min_col, max_col),
+    )
 
-    '''
+    """
     Converter(
         reader,
         output_dir,
@@ -223,11 +231,11 @@ def subset_sicdfile_3(input_file, bbox, output_file):
         row_limits=(min_row, max_row),
         col_limits=(min_col, max_col)
     )
-    '''
+    """
 
     reader.close()
 
-    print("Clipped SICD file created successfully.")
+    print('Clipped SICD file created successfully.')
 
 
 def subset_sicdfile_5(sicdfile, bbox, outfile):
@@ -244,14 +252,15 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
     hae = meta_src.GeoData.SCP.LLH.HAE
 
-
     # 3. Define the four corners of the geographic box in Sarpy format (Lat, Lon, HAE)
-    corners_geo = np.array([
-        [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
-        [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
-        [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
-        [bbox[1], bbox[0], hae]   # Bottom-Left (min_lat, min_lon)
-    ])
+    corners_geo = np.array(
+        [
+            [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
+            [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
+            [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
+            [bbox[1], bbox[0], hae],  # Bottom-Left (min_lat, min_lon)
+        ]
+    )
 
     # 4. Convert geographic coordinates to image pixel coordinates (Row, Col)
     corners_pixels = ground_to_image_geo(corners_geo, meta_src)
@@ -271,7 +280,7 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     max_col = min(img_cols, max_col)
 
     pixel_bounds = (min_row, max_row, min_col, max_col)
-    print(f"Calculated pixel bounds for create_chip: {pixel_bounds}")
+    print(f'Calculated pixel bounds for create_chip: {pixel_bounds}')
 
     chip_data = reader.read_chip(slice(min_row, max_row), slice(min_col, max_col))
 
@@ -299,8 +308,8 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     center_row_src = (max_row + min_row) / 2
     center_col_src = (max_col + min_col) / 2
 
-    meta.ImageData.SCPPixel.Row =  center_row_src
-    meta.ImageData.SCPPixel.Col =  center_col_src
+    meta.ImageData.SCPPixel.Row = center_row_src
+    meta.ImageData.SCPPixel.Col = center_col_src
 
     center_pixel = np.array([[center_row_src, center_col_src]])
 
@@ -339,27 +348,27 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     # Recompute SCPCOA using the updated SCP
     # meta.SCPCOA.rederive(meta.Grid, meta.Position, meta.GeoData)
 
-
     # meta.create_subset_structure(row_limits, col_limits), no any change after run this statement
-
 
     # Calculate and set the image corners
     # The 'override=True' ensures that the corners are recalculated even if they already exist.
     # meta.define_geo_image_corners(override=True)
 
     # update ImageArea
-    corners_orig = np.array([
-        [min_row, min_col],  # Upper-Left (UL)
-        [min_row, max_col],  # Upper-Right (UR)
-        [max_row, max_col],  # Lower-Right (LR)
-        [max_row, min_col]  # Lower-Left (LL)
-    ])
+    corners_orig = np.array(
+        [
+            [min_row, min_col],  # Upper-Left (UL)
+            [min_row, max_col],  # Upper-Right (UR)
+            [max_row, max_col],  # Lower-Right (LR)
+            [max_row, min_col],  # Lower-Left (LL)
+        ]
+    )
 
     # Project these corners to ECF coordinates using the *original* metadata's projection model
     corners_ecf = image_to_ground(corners_orig, meta_src)
 
     # Update the CornerPoints in the subset metadata object
-    '''
+    """
     # sicd_meta_subset.ImageArea.CornerPoints is a list of SICDType.ImageArea.CornerPoint objects
     meta.ImageArea.CornerPoints[0].Lat = corners_ecf[0, 1]
     meta.ImageArea.CornerPoints[0].Lon = corners_ecf[0, 0]
@@ -372,8 +381,7 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
 
     meta.ImageArea.CornerPoints[0].Lat = corners_ecf[0, 1]
     meta.ImageArea.CornerPoints[0].Lon = corners_ecf[0, 0]
-    '''
-
+    """
 
     # chip_data = reader.read_chip(slice(min_row, max_row), slice(min_col, max_col))
 
@@ -384,6 +392,7 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     writer.write_chip(chip_data)
     writer.close()
     reader.close()
+
 
 def subset_sicdfile(sicdfile, bbox, outfile):
     """
@@ -401,12 +410,14 @@ def subset_sicdfile(sicdfile, bbox, outfile):
     hae = meta_src.GeoData.SCP.LLH.HAE
 
     # 3. Define the four corners of the geographic box in Sarpy format (Lat, Lon, HAE)
-    corners_geo = np.array([
-        [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
-        [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
-        [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
-        [bbox[1], bbox[0], hae]   # Bottom-Left (min_lat, min_lon)
-    ])
+    corners_geo = np.array(
+        [
+            [bbox[3], bbox[0], hae],  # Top-Left (max_lat, min_lon)
+            [bbox[3], bbox[2], hae],  # Top-Right (max_lat, max_lon)
+            [bbox[1], bbox[2], hae],  # Bottom-Right (min_lat, max_lon)
+            [bbox[1], bbox[0], hae],  # Bottom-Left (min_lat, min_lon)
+        ]
+    )
 
     # 4. Convert geographic coordinates to image pixel coordinates (Row, Col)
     corners_pixels = ground_to_image_geo(corners_geo, meta_src)
@@ -455,7 +466,7 @@ def subset_sicdfile(sicdfile, bbox, outfile):
     meta.ImageData.FullImage.NumCols = max_col - min_col
 
     # get the subset data
-    subset_data = reader[row_bounds[0]:row_bounds[1], col_bounds[0]:col_bounds[1], 0]
+    subset_data = reader[row_bounds[0] : row_bounds[1], col_bounds[0] : col_bounds[1], 0]
 
     # write the subset data and its metadata
     with SICDWriter(outfile, meta, check_existence=False) as writer:
@@ -465,6 +476,5 @@ def subset_sicdfile(sicdfile, bbox, outfile):
 
 
 def subset_sicdfile_1(sicdfile: str, bbox: list, outfile: str):
-
- rowcolbox = getrowcol(sicdfile, bbox)
- clip_sicd_file(sicdfile, rowcolbox, outfile)
+    rowcolbox = getrowcol(sicdfile, bbox)
+    clip_sicd_file(sicdfile, rowcolbox, outfile)
