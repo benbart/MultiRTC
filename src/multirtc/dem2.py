@@ -151,7 +151,7 @@ def download_geodata_cooperative_dem_for_footprint(
     """
     output_dir = output_path.parent
     if output_path.exists():
-        return output_path
+        output_path.unlink()
 
     # footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
     footprint = shapely.geometry.box(*footprint.bounds)
