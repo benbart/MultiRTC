@@ -1,22 +1,22 @@
 from pathlib import Path
 import numpy as np
-from sarpy.io.complex.converter import conversion_utility, Converter
+from sarpy.io.complex.converter import conversion_utility
 from sarpy.utils.chip_sicd import create_chip
 from sarpy.geometry import point_projection
 from sarpy.io.complex.sicd import SICDReader, SICDWriter
 
 # from sarpy.io.complex.SICD import open_sicd
-from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground, image_to_ground_geo
+from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground
+# from sarpy.geometry.point_projection import image_to_ground_geo
 from sarpy.geometry.geocoords import ecf_to_geodetic
-from sarpy.utils.chip_sicd import create_chip
 
 from sarpy.io.complex.sicd_elements.GeoData import GeoDataType
 from sarpy.io.complex.sicd_elements.blocks import LatLonRestrictionType
 
 import pandas as pd
 import geopandas as gpd
-import copy
 
+from shapely.geometry import Polygon, Point
 
 def getrowcol(sicdfile, bbox):
     """
@@ -123,20 +123,13 @@ def clip_sicd_file(sicdfile: str, rowcolbox: tuple, geo_coords, outfile: str):
         print(f'An error occurred: {e}')
 
 
-def imagecorners(scidfile):
-    reader = SICDReader(file)
+def imagecorners(scidfile, output_filename):
+    reader = SICDReader(scidfile)
     meta = reader.sicd_meta
     frfc = (meta.GeoData.ImageCorners.FRFC[1], meta.GeoData.ImageCorners.FRFC[0])
     frlc = (meta.GeoData.ImageCorners.FRLC[1], meta.GeoData.ImageCorners.FRLC[0])
     lrlc = (meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.ImageCorners.LRLC[0])
     lrfc = (meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.ImageCorners.LRFC[0])
-
-    poly = Polygon([frfc, frlc, lrlc, lrfc])
-
-    frfc1 = point_projection.ground_to_image_geo((float(frfc[0]), float(frfc[1]), 0.0), meta, ordering='longlat')
-    frlc1 = point_projection.ground_to_image_geo((float(frlc[0]), float(frlc[1]), 0.0), meta, ordering='longlat')
-    lrlc1 = point_projection.ground_to_image_geo((float(lrlc[0]), float(lrlc[1]), 0.0), meta, ordering='longlat')
-    lrfc1 = point_projection.ground_to_image_geo((float(lrfc[0]), float(lrfc[1]), 0.0), meta, ordering='longlat')
 
     point_data = {
         'name': ['frfc', 'frlc', 'lrlc', 'lrfc'],

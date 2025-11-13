@@ -1,13 +1,12 @@
 """Create an RTC dataset for a multiple satellite platforms"""
 
 import argparse
-
 import sys
 import glob
 
 sys.path.remove(sys.path[0])
 
-from shapely.geometry import Polygon, box
+# from shapely.geometry import Polygon, box
 from pathlib import Path
 from sarpy.utils import convert_to_sicd
 
@@ -22,7 +21,7 @@ from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 
-from multirtc.preprocess import subset_sicdfile
+# from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
 

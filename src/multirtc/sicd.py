@@ -563,7 +563,7 @@ class SicdPfaSlc(Slc, SicdSlc):
         """
         ecef = pyproj.CRS(4978)  # ECEF on WGS84 Ellipsoid
         lla = pyproj.CRS(4979)  # WGS84 lat/lon/ellipsoid height
-        ecef2lla = pyproj.Transformer.from_crs(ecef, lla, always_xy=True)
+        # ecef2lla = pyproj.Transformer.from_crs(ecef, lla, always_xy=True)
         lla2ecef = pyproj.Transformer.from_crs(lla, ecef, always_xy=True)
 
         poly = box(*bbox)
