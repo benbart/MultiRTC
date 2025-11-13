@@ -104,12 +104,14 @@ def run_multirtc(
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
-    if bbox:
-        tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
-        subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
-        slc = get_slc(platform, tmp_granule, input_dir)
-    else:
-        slc = get_slc(platform, granule, input_dir)
+    # subset by sarpy does not work correctly, skip this subset of the sicd file
+    # if bbox:
+    #     tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
+    #    subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
+    #    slc = get_slc(platform, tmp_granule, input_dir)
+    # else:
+
+    slc = get_slc(platform, granule, input_dir)
 
     poly = slc.footprint
 

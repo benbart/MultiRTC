@@ -230,10 +230,11 @@ class SicdRzdSlc(Slc, SicdSlc):
 
     def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
                        ) -> isce3.product.GeoGridParameters:
-        # if bbox:
-        #    return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
-        # else:
-        return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
+        # subset works for range-zero-doppler format
+        if bbox:
+            return define_geogrid.generate_geogrids_via_bbox(self, spacing_meters, self.local_epsg, bbox=bbox)
+        else:
+            return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
 
     def _print_wkt(self):
@@ -433,7 +434,7 @@ class SicdPfaSlc(Slc, SicdSlc):
 
     def create_geogrid(self, spacing_meters: float, dem_path: Path, bbox: list = None
                        ) -> isce3.product.GeoGridParameters:
-        """subset does not works for SicdPfaSlc, so even if user input bbox, does not do subset"""
+        """subset does not work for PFA format, so even if user input bbox, does not do subset"""
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
     def calculate_range_range_rate_offset(self) -> np.ndarray:
