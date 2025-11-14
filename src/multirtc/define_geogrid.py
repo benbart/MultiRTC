@@ -1,12 +1,11 @@
 import isce3
 import numpy as np
 from shapely.geometry import Polygon, box
-import pyproj
 import rasterio
 from rasterio.mask import mask
 import geopandas as gpd
 from pathlib import Path
-from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
+# from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
 
 
 def get_point_epsg(lat: float, lon: float) -> int:
@@ -163,7 +162,7 @@ def generate_geogrids(
 
 def bbox84_to_bboxlocal(bbox, dst_epsg: int):
     poly = box(*bbox)
-    gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+    gdf84 = gpd.GeoSeries([poly], crs='EPSG:4326')
     gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
     poly = gdf_src.iloc[0]
     poly = box(*poly.bounds)
@@ -174,7 +173,7 @@ def bbox84_to_ploy_in_same_crs_as_reffile(bbox: list, reffile: str):
     with rasterio.open(reffile) as ds:
         dst_epsg = ds.crs.to_epsg()
         poly = box(*bbox)
-        gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+        gdf84 = gpd.GeoSeries([poly], crs='EPSG:4326')
         gdf_src = gdf84.to_crs(f'EPSG:{dst_epsg}')
         poly = gdf_src.iloc[0]
 
@@ -256,7 +255,9 @@ def generate_geogrids_via_bbox(slc, spacing_meters: float, epsg: int, bbox: list
     return geogrid_snapped
 
 
-def generate_geogrids_via_bbox2(slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list) -> isce3.product.GeoGridParameters:
+def generate_geogrids_via_bbox2(
+    slc, spacing_meters: float, epsg: int, dem_path: str, bbox: list
+) -> isce3.product.GeoGridParameters:
     """Computer a geogrid based on bbox, spacing_meters, and epsg
 
     Args:
@@ -298,4 +299,3 @@ def generate_geogrids_via_bbox2(slc, spacing_meters: float, epsg: int, dem_path:
     geogrid_snapped = snap_geogrid(geogrid, geogrid.spacing_x, geogrid.spacing_y)
 
     return geogrid_snapped
-

@@ -1,12 +1,12 @@
 """Create an RTC dataset for a multiple satellite platforms"""
 
 import argparse
-
 import sys
+import glob
 
 sys.path.remove(sys.path[0])
 
-from shapely.geometry import Polygon, box
+# from shapely.geometry import Polygon, box
 from pathlib import Path
 from sarpy.utils import convert_to_sicd
 
@@ -21,7 +21,7 @@ from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 
-from multirtc.preprocess import subset_sicdfile
+# from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
 
@@ -44,10 +44,14 @@ def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
 
 
 def convert_h5_to_nitf(h5file, outdir):
-    convert_to_sicd.convert(input_file=h5file, output_dir=outdir)
-    files = f'{Path(h5file).stem}*.nitf'
-    for file in Path(outdir).rglob(files):
-        granule = file.name
+    txt = f'{str(Path(h5file).stem)}*.nitf'
+    files = glob.glob(str(Path(outdir) / txt))
+    if files:
+        granule = Path(files[0]).name
+    else:
+        convert_to_sicd.convert(input_file=h5file, output_dir=outdir)
+        for file in glob.glob(str(Path(outdir) / txt)):
+            granule = Path(file).name
     return granule
 
 
@@ -84,8 +88,16 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
-    platform: str, granule: str, resolution: float, bbox: list, demtype: str, demfile: str,
-        work_dir: Path, apply_rtc: bool = True, lidar_upscale_res=0.5) -> None:
+    platform: str,
+    granule: str,
+    resolution: float,
+    bbox: list,
+    demtype: str,
+    demfile: str,
+    work_dir: Path,
+    apply_rtc: bool = True,
+    lidar_upscale_res=0.5,
+) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
     Args:
@@ -104,12 +116,14 @@ def run_multirtc(
     if platform == 'ICEYE' and Path(granule).suffix == '.h5':
         granule = convert_h5_to_nitf(str(Path(input_dir) / granule), str(input_dir))
 
-    if bbox:
-        tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
-        subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
-        slc = get_slc(platform, tmp_granule, input_dir)
-    else:
-        slc = get_slc(platform, granule, input_dir)
+    # subset by sarpy does not work correctly, skip this subset of the sicd file
+    # if bbox:
+    #     tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
+    #    subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
+    #    slc = get_slc(platform, tmp_granule, input_dir)
+    # else:
+
+    slc = get_slc(platform, granule, input_dir)
 
     poly = slc.footprint
 
@@ -128,7 +142,7 @@ def run_multirtc(
         lidar_dem_orig = demfile
         dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, res=lidar_upscale_res)
     else:
-        print("demtype is not correct. exit 1")
+        print('demtype is not correct. exit 1')
         exit(1)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
@@ -149,7 +163,7 @@ def run_multirtc(
         if rtcfile.exists():
             rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
             rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
-            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = 0)
+            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata=0)
             dem2.linear_to_db(rtcfile_clip, rtcfile_db)
     else:
         raise NotImplementedError(
@@ -213,7 +227,18 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.demtype, args.dem, args.work_dir, args.rtc, args.lidar_upscale_res)
+    run_multirtc(
+        args.platform,
+        args.granule,
+        args.resolution,
+        args.subset,
+        args.demtype,
+        args.dem,
+        args.work_dir,
+        args.rtc,
+        args.lidar_upscale_res,
+    )
+
 
 if __name__ == '__main__':
     main()

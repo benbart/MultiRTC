@@ -110,7 +110,7 @@ def readgeojsonfile(geojsonfile):
 def write_polygon(poly: Polygon, file: str, epsg: int = 4326):
     poly_gdf = gpd.GeoDataFrame(index=[0], crs=f'epsg:{epsg}', geometry=[poly])
     poly_gdf.set_crs(f'epsg:{epsg}')
-    poly_gdf.to_file(file, driver="GeoJSON")
+    poly_gdf.to_file(file, driver='GeoJSON')
 
 
 def read_polygon(geojsonfile):
@@ -151,7 +151,7 @@ def download_geodata_cooperative_dem_for_footprint(
     """
     output_dir = output_path.parent
     if output_path.exists():
-        return output_path
+        output_path.unlink()
 
     # footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
     footprint = shapely.geometry.box(*footprint.bounds)
@@ -253,11 +253,13 @@ def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, outpu
         out_image, out_transform = mask(src, [polygon_src], crop=True)
         out_meta = src.meta.copy()
         out_meta.update(
-            {'driver': 'GTiff',
-             'height': out_image.shape[1],
-             'width': out_image.shape[2],
-             'transform': out_transform,
-             'nodata': nodata}
+            {
+                'driver': 'GTiff',
+                'height': out_image.shape[1],
+                'width': out_image.shape[2],
+                'transform': out_transform,
+                'nodata': nodata,
+            }
         )
 
     with rasterio.open(output_dem, 'w', **out_meta) as dest:
@@ -289,7 +291,7 @@ def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
     # Handle NoData values
     if nodata is not None:
         # Create a mask for NoData values
-        mask = (linear_data == nodata)
+        mask = linear_data == nodata
         # Set nodata values to a safe value (e.g., NaN) before log operation
         linear_data[mask] = np.nan
 
@@ -311,7 +313,7 @@ def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
     profile.update(
         dtype=np.float32,  # dB data should be float
         nodata=nodata,
-        compress='lzw'  # Optional: add compression
+        compress='lzw',  # Optional: add compression
     )
 
     # Write the dB data to a new GeoTIFF file
@@ -410,7 +412,7 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1,
         poly: shapely.geometry.Polygon, it must be in the same coordinates as the input coordinates
     """
     if Path(output_raster).exists() and Path(output_raster).is_file():
-       Path(output_raster).unlink()
+        Path(output_raster).unlink()
 
     if poly:
         gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
@@ -728,7 +730,7 @@ def resample_to_res(dem_in: str, dem_out: str, res=3.0) -> Any:
 
 
 def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon, res=0.5):
-    """ extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
+    """extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
 
     Parameters
     ----------
@@ -775,7 +777,7 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
 
     # test purpose
     lidar_dem_tmp = lidar_dem.parent.joinpath(lidar_dem.stem + '_tmp.tif')
-    resample_to_res(lidar_dem, lidar_dem_tmp, res = res)
+    resample_to_res(lidar_dem, lidar_dem_tmp, res=res)
 
     # fill the lidar data to tmp_dem_30m_clipped, the output dem_filled is in WGS84 coordinates
     dem_filled = extend_lidar_dem_with_other_dem(lidar_dem_tmp, tmp_dem_30m_clipped)
@@ -788,7 +790,7 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     if dem_path.exists():
         dem_path.unlink()
     if dem_path.joinpath('.aux.xml').exists():
-       dem_path.joinpath('.aux.xml').unlink()
+        dem_path.joinpath('.aux.xml').unlink()
 
     shutil.copy(dem_filled_envelope, dem_path)
 
