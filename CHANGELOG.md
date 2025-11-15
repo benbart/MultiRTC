@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [PEP 440](https://www.python.org/dev/peps/pep-0440/)
 and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5]
+
+### Fixed
+* change 30m DEM resource URL to https://asf-dem-west.s3.amazonaws.com/v2/COP30/2021
+
 ## [0.5.4]
 
 ### Fixed
