@@ -15,7 +15,11 @@ from multirtc.fetch import download_file
 
 
 gdal.UseExceptions()
-URL = 'https://nisar.asf.earthdatacloud.nasa.gov/STATIC/DEM/v1.1/EPSG4326'
+
+# URL = 'https://nisar.asf.earthdatacloud.nasa.gov/STATIC/DEM/v1.1/EPSG4326'
+# DEM_GEOJSON = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/v2/cop30-2021-with-cop90-us-west-2-mirror.geojson'
+
+URL = 'https://asf-dem-west.s3.amazonaws.com/v2/COP30/2021'
 
 EGM2008_GEOID = {
     'WORLD': [
@@ -133,9 +137,17 @@ def get_dem_granule_url(lat: int, lon: int) -> str:
 
     lon_tens = np.floor_divide(lon, 20) * 20
     lon_cardinal = 'W' if lon_tens < 0 else 'E'
+    # Copernicus_DSM_COG_10_N00_00_E006_00_DEM
+    # Copernicus_DSM_COG_10_N00_00_E006_00_DEM.tif
+    # https://asf-dem-west.s3.amazonaws.com/v2/COP30/2021/Copernicus_DSM_COG_10_N00_00_E006_00_DEM/Copernicus_DSM_COG_10_N00_00_E006_00_DEM.tif
+    # N60_W160/DEM_N64_00_W148_00.tif
 
-    prefix = f'{lat_cardinal}{np.abs(lat_tens):02d}_{lon_cardinal}{np.abs(lon_tens):03d}'
-    filename = f'DEM_{lat_cardinal}{np.abs(lat):02d}_00_{lon_cardinal}{np.abs(lon):03d}_00.tif'
+    # prefix = f'{lat_cardinal}{np.abs(lat_tens):02d}_{lon_cardinal}{np.abs(lon_tens):03d}'
+    prefix = f'Copernicus_DSM_COG_10_{lat_cardinal}{np.abs(lat):02d}_00_{lon_cardinal}{np.abs(lon):03d}_00_DEM'
+
+    # filename = f'DEM_{lat_cardinal}{np.abs(lat):02d}_00_{lon_cardinal}{np.abs(lon):03d}_00.tif'
+    filename = f'{prefix}.tif'
+
     file_url = f'{URL}/{prefix}/{filename}'
     return file_url
 

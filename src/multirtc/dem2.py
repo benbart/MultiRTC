@@ -26,7 +26,7 @@ import pystac_client
 from sarpy.io.complex.converter import conversion_utility
 from sarpy.utils.chip_sicd import create_chip
 
-from multirtc import dem
+from multirtc import dem, dem1
 
 
 DEM_GEOJSON = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/v2/cop30_20250407.geojson'
@@ -769,7 +769,7 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
     tmp_dem_30m = input_path / 'tmp_dem_30m.tif'
     if tmp_dem_30m.exists():
         os.remove(tmp_dem_30m)
-    dem.download_opera_dem_for_footprint(tmp_dem_30m, envelope)
+    dem1.download_opera_dem_for_footprint(tmp_dem_30m, envelope)
 
     # clip with envelope
     tmp_dem_30m_clipped = input_path / 'tmp_dem_30m_clipped.tif'
