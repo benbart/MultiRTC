@@ -6,7 +6,7 @@ from sarpy.geometry import point_projection
 from sarpy.io.complex.sicd import SICDReader, SICDWriter
 
 # from sarpy.io.complex.SICD import open_sicd
-from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground
+from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground, image_to_ground_geo
 # from sarpy.geometry.point_projection import image_to_ground_geo
 from sarpy.geometry.geocoords import ecf_to_geodetic
 
@@ -131,6 +131,15 @@ def imagecorners(scidfile, output_filename):
     lrlc = (meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.ImageCorners.LRLC[0])
     lrfc = (meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.ImageCorners.LRFC[0])
 
+    frfc_llh = (meta.GeoData.ImageCorners.FRFC[0], meta.GeoData.ImageCorners.FRFC[1], meta.GeoData.SCP.LLH.HAE)
+    frlc_llh = (meta.GeoData.ImageCorners.FRLC[0], meta.GeoData.ImageCorners.FRLC[1], meta.GeoData.SCP.LLH.HAE)
+    lrlc_llh = (meta.GeoData.ImageCorners.LRLC[0], meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.SCP.LLH.HAE)
+    lrfc_llh = (meta.GeoData.ImageCorners.LRFC[0], meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.SCP.LLH.HAE)
+
+    ground_points = [frfc, frlc, lrlc, lrfc]
+
+    ground_points_llh = [frfc_llh, frlc_llh, lrlc_llh, lrfc_llh]
+
     point_data = {
         'name': ['frfc', 'frlc', 'lrlc', 'lrfc'],
         'geometry': [Point(frfc), Point(frlc), Point(lrlc), Point(lrfc)],
@@ -143,6 +152,19 @@ def imagecorners(scidfile, output_filename):
     gdf = gpd.GeoDataFrame(df)
     gdf = gdf.set_crs('EPSG:4326')
     gdf.to_file(output_filename, driver='GeoJSON')
+
+    frfci = (meta.ImageData.FirstRow, meta.ImageData.FirstCol)
+    frlci = (meta.ImageData.FirstRow,meta.ImageData.NumCols)
+    lrlci = (meta.ImageData.NumRows, meta.ImageData.NumCols)
+    lrfci = (meta.ImageData.NumRows, meta.ImageData.FirstCol)
+
+    img_points = [frfci, frlci, lrlci, lrfci]
+
+    ecf_points = image_to_ground(img_points, meta)
+
+    llh_points = ecf_to_geodetic(ecf_points)
+
+    llh_points_2 = image_to_ground_geo(img_points, meta)
 
 
 def subset_sicdfile_3(input_file, bbox, output_file):

@@ -14,6 +14,7 @@ from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
 
 from multirtc import dem
+from multirtc import dem1
 from multirtc import dem2
 from multirtc.base import Slc
 from multirtc.create_rtc import rtc
@@ -21,7 +22,7 @@ from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 
-# from multirtc.preprocess import subset_sicdfile
+from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
 
@@ -119,8 +120,8 @@ def run_multirtc(
     # subset by sarpy does not work correctly, skip this subset of the sicd file
     # if bbox:
     #     tmp_granule = f'{granule.split(".")[0]}_subset.ntf'
-    #    subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
-    #    slc = get_slc(platform, tmp_granule, input_dir)
+    #     subset_sicdfile(str(input_dir / granule), bbox, str(input_dir / tmp_granule))
+    #     slc = get_slc(platform, tmp_granule, input_dir)
     # else:
 
     slc = get_slc(platform, granule, input_dir)
@@ -129,7 +130,7 @@ def run_multirtc(
 
     if demtype == 'Copernicus 30m':
         dem_path = input_dir / 'dem_30d0.tif'
-        dem.download_opera_dem_for_footprint(dem_path, poly)
+        dem1.download_opera_dem_for_footprint(dem_path, poly)
     elif demtype == 'Geodata 3m':
         dem_path = input_dir / 'dem_3d0.tif'
         dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly)
