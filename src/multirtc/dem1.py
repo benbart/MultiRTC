@@ -178,7 +178,7 @@ def download_opera_dem_for_footprint(output_path: Path, footprint: Polygon, buff
     """
     output_dir = output_path.parent
     if output_path.exists():
-        return output_path
+        output_path.unlink()
 
     footprint = box(*footprint.buffer(buffer).bounds)
     footprints = check_antimeridean(footprint)

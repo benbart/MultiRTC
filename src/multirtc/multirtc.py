@@ -9,6 +9,7 @@ sys.path.remove(sys.path[0])
 # from shapely.geometry import Polygon, box
 from pathlib import Path
 from sarpy.utils import convert_to_sicd
+import numpy as np
 
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
@@ -94,10 +95,12 @@ def run_multirtc(
     resolution: float,
     bbox: list,
     demtype: str,
+    embed_demtype: str,
     demfile: str,
     work_dir: Path,
     apply_rtc: bool = True,
     lidar_upscale_res=0.5,
+    lidar_buffer_size=0.05
 ) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
@@ -129,22 +132,28 @@ def run_multirtc(
     poly = slc.footprint
 
     if demtype == 'Copernicus 30m':
+        # surface mode (DSM), height above wgs84 ellipsoid
         dem_path = input_dir / 'dem_30d0.tif'
         dem1.download_opera_dem_for_footprint(dem_path, poly)
     elif demtype == 'Geodata 3m':
+        # terrain mode (DTM), height above geoid EMG96
         dem_path = input_dir / 'dem_3d0.tif'
         dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly)
     elif demtype == 'ArcticDEM 2m':
+        # surface mode, height above the wgs84 ellipsoid
         dem_path = input_dir / 'dem_2d0.tif'
         dem2.download_2m_arcticdem(dem_path, poly)
     elif demtype == 'Lidar 0.5m':
+        # choose ground in the cloud point to get the terrain mode, height above the wgs84 ellipsoid
         dem_path = input_dir / 'dem_0d5.tif'
         # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
         lidar_dem_orig = demfile
-        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, res=lidar_upscale_res)
+        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, buffersize=lidar_buffer_size, embed_demtype=embed_demtype, lidar_upscale_res=lidar_upscale_res)
     else:
         print('demtype is not correct. exit 1')
         exit(1)
+
+    dem1.validate_dem(dem_path, slc.footprint)
 
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
 
@@ -164,7 +173,7 @@ def run_multirtc(
         if rtcfile.exists():
             rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
             rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
-            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata=0)
+            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = np.nan)
             dem2.linear_to_db(rtcfile_clip, rtcfile_db)
     else:
         raise NotImplementedError(
@@ -219,9 +228,16 @@ def main():
         default='Copernicus 30m',
         help='Choose the DEM type, default is Copernicus 30m',
     )
+    parser.add_argument(
+        '--embed_demtype',
+        choices=['Copernicus 30m', 'Geodata 3m'],
+        default='Copernicus 30m',
+        help='Choose the embeded DEM',
+    )
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     parser.add_argument('--rtc', type=str2bool, default=True, help='create RTC or geocode only product')
     parser.add_argument('--lidar_upscale_res', type=float, default=0.5, help='choose upscale res for lidar dem')
+    parser.add_argument('--lidar_buffer_size', type=float, default=0.01, help='buffer size for slc footprint')
 
     args = parser.parse_args()
 
@@ -234,10 +250,12 @@ def main():
         args.resolution,
         args.subset,
         args.demtype,
+        args.embed_demtype,
         args.dem,
         args.work_dir,
         args.rtc,
         args.lidar_upscale_res,
+        args.lidar_buffer_size,
     )
 
 
