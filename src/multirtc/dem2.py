@@ -39,7 +39,7 @@ geoid12_alaska = '/home/conda/crrel/dem/egm/geoid12_alaska/g2012a00.tif'
 # DEM_GEODATA_GEOJSON = "/home/conda/data/dem/geodata/DGED5b_new2/JSON_AK_DGED5B_6N.geojson"
 
 DEM_GEODATA_GEOJSON = 's3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_all.geojson'
-
+DEM_GEODATA_GEOJSON_LOCAL = '/home/conda/crrel/dem/DGED5b/METADATA/JSON_AK_DGED5B_all.geojson'
 gdal.UseExceptions()
 ogr.UseExceptions()
 
@@ -89,9 +89,9 @@ def convert_to_ellipsoid_height(dem_file: Path, geoid) -> None:
         del dem_ds
 
 
-def process_dem(dem_file: Path):
+def process_dem(dem_file: Path, geoid: str):
     reproject_to_4326(dem_file)
-    convert_to_height_above_ellipsoid(dem_file)
+    convert_to_ellipsoid_height(dem_file, geoid)
 
 
 def polygon2geojsonfile(poly: shapely.geometry.Polygon, geojsonfile, crs: str = 'EPSG:4326'):
@@ -214,8 +214,62 @@ def download_geodata_cooperative_dem_for_footprint(
         # reproject to EPSG:4326
         reproject_to_4326(output_path)
 
-        # convert to height above the ellipsoid
+        # geodata 3m is base on geoid EGM96, need to convert to height above the ellipsoid
         convert_to_ellipsoid_height(output_path, egm96)
+
+
+def download_geodata_cooperative_dem_for_footprint_local(
+    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02) -> None:
+    """
+    Download the OPERA DEM for a given footprint and save it to the specified output path.
+
+    Args:
+        output_path: Path where the DEM will be saved.
+        footprint: Polygon representing the area of interest.
+        buffer: Buffer distance in degrees to extend the footprint.
+    """
+    output_dir = output_path.parent
+    if output_path.exists():
+        output_path.unlink()
+
+    footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
+    footprints = dem.check_antimeridean(footprint)
+    footprints = shapely.geometry.MultiPolygon(footprints)
+
+    meta_geojson = Path(DEM_GEODATA_GEOJSON_LOCAL)
+    if not meta_geojson.exists():
+        print('can not download the geodata meta geojosn file')
+        sys.exit(1)
+
+    dem_dir = meta_geojson.parent.parent
+    gdf = gpd.read_file(meta_geojson)
+    intersects_series = gdf.geometry.intersects(footprints)
+    intersection_rows = gdf[intersects_series]
+
+    with TemporaryDirectory() as temp_dir:
+        input_files = []
+        for index, row in intersection_rows.iterrows():
+            seg2 = row['CellID']
+            zone = seg2[0:2]
+            nume = seg2[2:4]
+            # file = f'U_{seg2}_WGS84_Ellips.tif'
+            file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
+            file_tmp = f'{str(Path(file).stem)}_tmp.tif'
+            files_found = list(dem_dir.rglob(file))
+            if files_found:
+                shutil.copy(files_found[0], Path(f'{temp_dir}/{file_tmp}'))
+                # convert to EPSG:32606
+                gdal.Warp(f'{temp_dir}/{file}', f'{temp_dir}/{file_tmp}', dstSRS='EPSG:32606', resampleAlg='near')
+                input_files.append(f'{temp_dir}/{file}')
+
+        vrt_filepath = f'{temp_dir}/dem.vrt'
+        gdal.BuildVRT(vrt_filepath, input_files)
+        ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
+        gdal.Translate(str(output_path), ds, format='GTiff')
+        ds = None
+
+        # reproject to EPSG:4326
+        reproject_to_4326(output_path)
 
 
 def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str):
@@ -259,13 +313,16 @@ def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, outpu
         src_wkt = src.profile['crs'].to_wkt()
         gdf_src = gdf84.to_crs(src_wkt)
         polygon_src = gdf_src.iloc[0]
-        out_image, out_transform = mask(src, [polygon_src], crop=True, nodata=nodata)
+        if nodata:
+            out_image, out_transform = mask(src, [polygon_src], crop=True, nodata=np.nan)
+        else:
+            out_image, out_transform = mask(src, [polygon_src], crop=True, nodata=np.nan)
 
         # convert nan to nodata for pixels in out_image
         src_nodata = src.nodata
         src_mask = np.full(out_image.shape, False, dtype=bool)
         if src_nodata:
-            if np.isnan(src_data):
+            if np.isnan(src_nodata):
                 src_mask = np.isnan(out_image)
             else:
                 src_mask = out_image == src_nodata
@@ -278,7 +335,8 @@ def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, outpu
                 new_mask = out_image == nodata
 
         # Set nodata values to a safe value (e.g., NaN) before log operation
-        out_mask = np.logical_or(src_mask, new_mask)
+        arrays_to_or = (src_mask, new_mask, np.isnan(out_image))
+        out_mask = np.logical_or.reduce(arrays_to_or)
         if nodata:
             out_image[out_mask] = nodata
         elif src_nodata:
@@ -346,7 +404,7 @@ def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
             new_mask = linear_data == nodata
 
     # Set nodata values to a safe value (e.g., NaN) before log operation
-    out_mask = np.logical_or(src_mask, new_mask)
+    out_mask = np.logical_or.reduce((src_mask, new_mask, np.isnan(linear_data)))
     linear_data[out_mask] = np.nan
 
     # Apply the dB conversion formula
@@ -807,7 +865,7 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     clip_raster_by_poly(infile, outfile, bandnum=bandnum, poly=poly)
     reproject_to_4326(Path(outfile))
     set_nodata(outfile, nodata=0.0)
-    convert_to_ellipsoid_based_height(Path(outfile))
+    convert_to_ellipsoid_height(Path(outfile), geoid)
 
 
 def resample_to_res(dem_in: str, dem_out: str, res=3.0) -> Any:
@@ -947,6 +1005,9 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
             tmp_dem.unlink()
 
         dem1.download_opera_dem_for_footprint(tmp_dem, envelope, buffer = 0)
+        # if the 30m DEM is based on geoid EGM2008, need to convert to based on ellipsoid
+        dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
+
     else:
         tmp_dem = input_path / 'tmp_dem_3m.tif'
         if tmp_dem.exists():

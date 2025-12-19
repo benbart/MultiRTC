@@ -135,9 +135,11 @@ def run_multirtc(
         # surface mode (DSM), height above wgs84 ellipsoid
         dem_path = input_dir / 'dem_30d0.tif'
         dem1.download_opera_dem_for_footprint(dem_path, poly)
+        dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
     elif demtype == 'Geodata 3m':
         # terrain mode (DTM), height above geoid EMG96
-        dem_path = input_dir / 'dem_3d0.tif'
+        dem_path = input_dir / 'dem_3d0_ellipsoid.tif'
+        # dem2.download_geodata_cooperative_dem_for_footprint_local(dem_path, poly)
         dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly)
     elif demtype == 'ArcticDEM 2m':
         # surface mode, height above the wgs84 ellipsoid
@@ -155,6 +157,11 @@ def run_multirtc(
 
     dem1.validate_dem(dem_path, slc.footprint)
 
+    if isinstance(slc, SicdRzdSlc) and len(bbox) != 0:
+        outfile_prex = 'subset'
+    else:
+        outfile_prex = 'full'
+
     geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=bbox)
 
     if slc.supports_rtc:
@@ -171,10 +178,11 @@ def run_multirtc(
         rtcfile = output_dir / f'{slc.filepath.stem}.tif'
 
         if rtcfile.exists():
-            rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_clip_nodata.tif'
-            rtcfile_db = rtcfile.parent / f'{rtcfile.stem}_clip_nodata_db.tif'
-            dem2.clip_and_set_nodata(rtcfile, poly, rtcfile_clip, nodata = np.nan)
-            dem2.linear_to_db(rtcfile_clip, rtcfile_db)
+            rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_{outfile_prex}_{dem_path.stem}_clip_nodata.tif'
+            rtcfile_db = rtcfile_clip.parent / f'{rtcfile_clip.stem}_db.tif'
+
+            dem2.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata = np.nan)
+            dem2.linear_to_db(str(rtcfile_clip), str(rtcfile_db))
     else:
         raise NotImplementedError(
             'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'

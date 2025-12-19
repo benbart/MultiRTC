@@ -50,6 +50,7 @@ dependencies:
   - geopandas
   - rasterio
   - pystac-client
+  - pdal
   # For multimetric
   - matplotlib
   - pandas

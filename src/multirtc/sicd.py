@@ -432,7 +432,7 @@ class SicdPfaSlc(Slc, SicdSlc):
 
     def create_geogrid(
         self, spacing_meters: float, dem_path: Path, bbox: list = None
-    ) -> isce3.product.GeoGridParameters:
+) -> isce3.product.GeoGridParameters:
         """subset does not work for PFA format, so even if user input bbox, does not do subset"""
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 
