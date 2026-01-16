@@ -139,8 +139,8 @@ def run_multirtc(
     elif demtype == 'Geodata 3m':
         # terrain mode (DTM), height above geoid EMG96
         dem_path = input_dir / 'dem_3d0_ellipsoid.tif'
-        # dem2.download_geodata_cooperative_dem_for_footprint_local(dem_path, poly)
-        dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly)
+        dem2.download_geodata_cooperative_dem_for_footprint_local(dem_path, poly, buffer=0.1)
+        # dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly, buffer=0.1)
     elif demtype == 'ArcticDEM 2m':
         # surface mode, height above the wgs84 ellipsoid
         dem_path = input_dir / 'dem_2d0.tif'

@@ -20,6 +20,8 @@ import json
 import geopandas as gpd
 import subprocess
 import rasterio
+from rasterio.fill import fillnodata
+import numpy as np
 from rasterio.transform import Affine
 from rasterio.mask import mask
 from rasterio.warp import calculate_default_transform, reproject, Resampling
@@ -40,6 +42,7 @@ geoid12_alaska = '/home/conda/crrel/dem/egm/geoid12_alaska/g2012a00.tif'
 
 DEM_GEODATA_GEOJSON = 's3://arctic-trafficability/DGED5b/METADATA/JSON_AK_DGED5B_all.geojson'
 DEM_GEODATA_GEOJSON_LOCAL = '/home/conda/crrel/dem/DGED5b/METADATA/JSON_AK_DGED5B_all.geojson'
+DEM_GEODATA_LOCAL = '/home/conda/crrel/dem/DGED5b/ORIGINAL/UTM_6N'
 gdal.UseExceptions()
 ogr.UseExceptions()
 
@@ -146,6 +149,57 @@ def get_geodata_meta(geodata_geojson):
         return None
 
 
+def fill_gap_of_vrt(input_vrt:str, output_tif:str, max_search_distance:float = 100, smoothing_iterations:int = 0):
+    with rasterio.open(input_vrt) as src:
+        image = src.read()
+        profile = src.profile
+        # Identify nodata pixels (assuming nodata is defined in the source, typically 0 or -9999)
+        # If your source files don't have a nodata value set, you may need to define one explicitly
+        if src.nodata is not None:
+            mask = (image == src.nodata)
+        else:
+            # If no nodata value is set, create a mask for existing data
+            # The 'fillnodata' function expects a mask where 0 means fill, 1 means keep
+            mask = np.ones(image.shape, dtype=np.uint8) * 255 # all valid initially
+
+        # Fill holes for each band
+        for i in range(src.count):
+            # The mask needs to be 0 for areas to fill and 1 for valid data
+            band_mask = (image[i] != src.nodata).astype(np.uint8) if src.nodata is not None else np.ones(image[i].shape, dtype=np.uint8)
+
+            # Fill the nodata regions using interpolation
+            # max_search_distance can be adjusted based on the gap size
+            filled_band = fillnodata(image[i], band_mask, max_search_distance=max_search_distance, smoothing_iterations=smoothing_iterations)
+            image[i] = filled_band
+
+        # Update profile for the new output file
+        profile.update(driver="GTiff", nodata=src.nodata) # Keep the original nodata value if desired
+
+        with rasterio.open(output_tif, "w", **profile) as dst:
+            dst.write(image)
+
+
+def download_dem_file(row, out_dir):
+    session = boto3.Session(profile_name='arctic-traffic')
+    # AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    # AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    # session = boto3.Session(
+    #    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    #    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    #    region_name='us-east-2'  # Optional: specify your desired region
+    # )
+    client = session.client('s3')
+    bucket_name = 'arctic-trafficability'
+    seg2 = row['CellID']
+    zone = seg2[0:2]
+    nume = seg2[2:4]
+    file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
+    file_tmp = f'{str(Path(file).stem)}_tmp.tif'
+    s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
+    client.download_file(bucket_name, s3_object_key, f'{out_dir}/{file}')
+    return Path(f'{out_dir}/{file}')
+
+
 def download_geodata_cooperative_dem_for_footprint(
     output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02) -> None:
     """
@@ -194,6 +248,7 @@ def download_geodata_cooperative_dem_for_footprint(
             nume = seg2[2:4]
 
             file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
+            file_tmp = f'{str(Path(file).stem)}_tmp.tif'
             s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
 
             # url = f's3://arctic-trafficability/DGED5b/UTM_{zone}/{nume}/{file}'
@@ -204,13 +259,19 @@ def download_geodata_cooperative_dem_for_footprint(
 
             # if result.returncode == 0 and Path(f'{temp_dir}/{file}').exists():
             if Path(f'{temp_dir}/{file}').exists():
+                # convert to EPSG:32606
+                # gdal.Warp(f'{temp_dir}/{file}', f'{temp_dir}/{file_tmp}', dstSRS='EPSG:32606', resampleAlg='near')
                 input_files.append(f'{temp_dir}/{file}')
 
         vrt_filepath = f'{temp_dir}/dem.vrt'
         gdal.BuildVRT(vrt_filepath, input_files)
-        ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
-        gdal.Translate(str(output_path), ds, format='GTiff')
-        ds = None
+
+        # ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
+        # gdal.Translate(str(output_path), ds, format='GTiff')
+        # ds = None
+
+        fill_gap_of_vrt(vrt_filepath, str(output_path))
+
         # reproject to EPSG:4326
         reproject_to_4326(output_path)
 
@@ -241,7 +302,9 @@ def download_geodata_cooperative_dem_for_footprint_local(
         print('can not download the geodata meta geojosn file')
         sys.exit(1)
 
-    dem_dir = meta_geojson.parent.parent
+    dem_dir = Path(DEM_GEODATA_LOCAL)
+    dem_dir.mkdir(parents=True, exist_ok=True)
+
     gdf = gpd.read_file(meta_geojson)
     intersects_series = gdf.geometry.intersects(footprints)
     intersection_rows = gdf[intersects_series]
@@ -256,20 +319,32 @@ def download_geodata_cooperative_dem_for_footprint_local(
             file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
             file_tmp = f'{str(Path(file).stem)}_tmp.tif'
             files_found = list(dem_dir.rglob(file))
-            if files_found:
-                shutil.copy(files_found[0], Path(f'{temp_dir}/{file_tmp}'))
-                # convert to EPSG:32606
-                gdal.Warp(f'{temp_dir}/{file}', f'{temp_dir}/{file_tmp}', dstSRS='EPSG:32606', resampleAlg='near')
-                input_files.append(f'{temp_dir}/{file}')
+
+            if len(files_found) == 0:
+                # download from s3 and save to the local disk
+                files_found.append(download_dem_file(row, str(dem_dir)))
+
+            shutil.copy(files_found[0], Path(f'{temp_dir}/{file}'))
+            # convert to EPSG:32606, it also automatically converts the emg96-based height to ellipsoid-based height
+            # gdal.Warp(f'{temp_dir}/{file}', f'{temp_dir}/{file_tmp}', dstSRS='EPSG:32606', resampleAlg='near')
+            input_files.append(f'{temp_dir}/{file}')
 
         vrt_filepath = f'{temp_dir}/dem.vrt'
         gdal.BuildVRT(vrt_filepath, input_files)
-        ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
-        gdal.Translate(str(output_path), ds, format='GTiff')
-        ds = None
+
+        # ds = gdal.Open(str(vrt_filepath), gdal.GA_ReadOnly)
+        # gdal.Translate(str(output_path), ds, format='GTiff')
+        # ds = None
+
+        fill_gap_of_vrt(vrt_filepath, str(output_path))
 
         # reproject to EPSG:4326
         reproject_to_4326(output_path)
+
+        # geodata 3m is base on geoid EGM96, need to convert to height above the ellipsoid.
+        # if 3m geodata file is converted to 32606 before mosaic, the mosaic dem is already ellipsoid-based height,
+        # no need to convert to ellipsoid-height.
+        convert_to_ellipsoid_height(output_path, egm96)
 
 
 def clip_dem(input_dem: str, polygon: shapely.geometry.Polygon, output_dem: str):

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [PEP 440](https://www.python.org/dev/peps/pep-0440/)
 and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6]
+
+### Fixed
+* fill the gaps in the DEM file that is mosaic of the Geodata DEM tile files.
+* download the Geodata DEM tile files from s3 if it is not in the local space.
+
 ## [0.5.5]
 
 ### Fixed
