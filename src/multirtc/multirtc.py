@@ -100,7 +100,7 @@ def run_multirtc(
     work_dir: Path,
     apply_rtc: bool = True,
     lidar_upscale_res=0.5,
-    lidar_buffer_size=0.05
+    lidar_buffer_size=0.05,
 ) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
@@ -150,7 +150,14 @@ def run_multirtc(
         dem_path = input_dir / 'dem_0d5.tif'
         # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
         lidar_dem_orig = demfile
-        dem2.download_lidar_dem_for_footprint(lidar_dem_orig, dem_path, poly, buffersize=lidar_buffer_size, embed_demtype=embed_demtype, lidar_upscale_res=lidar_upscale_res)
+        dem2.download_lidar_dem_for_footprint(
+            lidar_dem_orig,
+            dem_path,
+            poly,
+            buffersize=lidar_buffer_size,
+            embed_demtype=embed_demtype,
+            lidar_upscale_res=lidar_upscale_res,
+        )
     else:
         print('demtype is not correct. exit 1')
         exit(1)
@@ -181,7 +188,7 @@ def run_multirtc(
             rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_{outfile_prex}_{dem_path.stem}_clip_nodata.tif'
             rtcfile_db = rtcfile_clip.parent / f'{rtcfile_clip.stem}_db.tif'
 
-            dem2.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata = np.nan)
+            dem2.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata=np.nan)
             dem2.linear_to_db(str(rtcfile_clip), str(rtcfile_db))
     else:
         raise NotImplementedError(

@@ -149,33 +149,38 @@ def get_geodata_meta(geodata_geojson):
         return None
 
 
-def fill_gap_of_vrt(input_vrt:str, output_tif:str, max_search_distance:float = 100, smoothing_iterations:int = 0):
-    with rasterio.open(input_vrt) as src:
+def fill_gap_of_vrt(input_vrt: str, output_tif: str, max_search_distance: float = 100, smoothing_iterations: int = 0):
+    with (rasterio.open(input_vrt) as src):
         image = src.read()
         profile = src.profile
         # Identify nodata pixels (assuming nodata is defined in the source, typically 0 or -9999)
         # If your source files don't have a nodata value set, you may need to define one explicitly
         if src.nodata is not None:
-            mask = (image == src.nodata)
+            mask = image == src.nodata
         else:
             # If no nodata value is set, create a mask for existing data
             # The 'fillnodata' function expects a mask where 0 means fill, 1 means keep
-            mask = np.ones(image.shape, dtype=np.uint8) * 255 # all valid initially
+            mask = np.ones(image.shape, dtype=np.uint8) * 255  # all valid initially
 
         # Fill holes for each band
         for i in range(src.count):
             # The mask needs to be 0 for areas to fill and 1 for valid data
-            band_mask = (image[i] != src.nodata).astype(np.uint8) if src.nodata is not None else np.ones(image[i].shape, dtype=np.uint8)
-
+            band_mask = (
+                    (image[i] != src.nodata).astype(np.uint8)
+                    if src.nodata is not None
+                    else np.ones(image[i].shape, dtype=np.uint8)
+            )
             # Fill the nodata regions using interpolation
             # max_search_distance can be adjusted based on the gap size
-            filled_band = fillnodata(image[i], band_mask, max_search_distance=max_search_distance, smoothing_iterations=smoothing_iterations)
+            filled_band = fillnodata(
+                image[i], band_mask, max_search_distance=max_search_distance, smoothing_iterations=smoothing_iterations
+            )
             image[i] = filled_band
 
         # Update profile for the new output file
-        profile.update(driver="GTiff", nodata=src.nodata) # Keep the original nodata value if desired
+        profile.update(driver="GTiff", nodata=src.nodata)  # Keep the original nodata value if desired
 
-        with rasterio.open(output_tif, "w", **profile) as dst:
+        with rasterio.open(output_tif, 'w', **profile) as dst:
             dst.write(image)
 
 
@@ -201,7 +206,8 @@ def download_dem_file(row, out_dir):
 
 
 def download_geodata_cooperative_dem_for_footprint(
-    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02) -> None:
+    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02
+) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
 
@@ -280,7 +286,8 @@ def download_geodata_cooperative_dem_for_footprint(
 
 
 def download_geodata_cooperative_dem_for_footprint_local(
-    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02) -> None:
+    output_path: Path, footprint: shapely.geometry.Polygon, buffer: float = 0.02
+) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
 
@@ -836,7 +843,7 @@ def fill_lidar_dem_with_other_dem(lidar_dem, coregfile):
     return out_dem
 
 
-def reproject_raster_via_rasterio(src_file, dst_file, dst_crs:str = 'EPSG:4326'):
+def reproject_raster_via_rasterio(src_file, dst_file, dst_crs: str = 'EPSG:4326'):
     import rasterio
     from rasterio.warp import calculate_default_transform, reproject, Resampling
 
@@ -857,17 +864,12 @@ def reproject_raster_via_rasterio(src_file, dst_file, dst_crs:str = 'EPSG:4326')
             dst_crs,  # Destination CRS
             src.width,
             src.height,
-            *src.bounds
+            *src.bounds,
         )
 
         # Update the metadata for the new file
         profile = src.profile
-        profile.update({
-            'crs': dst_crs,
-            'transform': dst_transform,
-            'width': dst_width,
-            'height': dst_height
-        })
+        profile.update({'crs': dst_crs, 'transform': dst_transform, 'width': dst_width, 'height': dst_height})
 
         # Create a new file with the updated profile
         with rasterio.open(dst_file, 'w', **profile) as dst:
@@ -880,7 +882,7 @@ def reproject_raster_via_rasterio(src_file, dst_file, dst_crs:str = 'EPSG:4326')
                     src_crs=src.crs,
                     dst_transform=dst_transform,
                     dst_crs=dst_crs,
-                    resampling=Resampling.nearest  # Or other resampling method like bilinear
+                    resampling=Resampling.nearest,  # Or other resampling method like bilinear
                 )
 
 
@@ -971,12 +973,12 @@ def get_utm_epsg(bbox):
         int: The WGS 84 UTM EPSG code, or None if not found.
     """
     utm_crs_list = query_utm_crs_info(
-        datum_name="WGS 84",
+        datum_name='WGS 84',
         area_of_interest=AreaOfInterest(
-            west_lon_degree = bbox[0],
-            south_lat_degree = bbox[1],
-            east_lon_degree = bbox[2],
-            north_lat_degree = bbox[3],
+            west_lon_degree=bbox[0],
+            south_lat_degree=bbox[1],
+            east_lon_degree=bbox[2],
+            north_lat_degree=bbox[3],
         ),
     )
     if utm_crs_list:
@@ -988,13 +990,14 @@ def get_utm_epsg(bbox):
 
 def resample_image_with_wgs84_by_res(infile, outfile, res=3.0):
     from pyproj import Transformer
+
     # get UTM epsg code
     ds = rasterio.open(infile)
     bounds = ds.bounds
     utm_epsg_code = get_utm_epsg([bounds.left, bounds.bottom, bounds.right, bounds.top])
 
-    transformer_degree_to_meter = Transformer.from_crs("epsg:4326", f'epsg:{utm_epsg_code}', always_xy=True)
-    transformer_meter_to_degree = Transformer.from_crs(f'epsg:{utm_epsg_code}', "epsg:4326", always_xy=True)
+    transformer_degree_to_meter = Transformer.from_crs('epsg:4326', f'epsg:{utm_epsg_code}', always_xy=True)
+    transformer_meter_to_degree = Transformer.from_crs(f'epsg:{utm_epsg_code}', 'epsg:4326', always_xy=True)
 
     # lon and lat of the center pixel of the infile
     center_row = ds.height / 2.0
@@ -1004,15 +1007,15 @@ def resample_image_with_wgs84_by_res(infile, outfile, res=3.0):
     x, y = transformer_degree_to_meter.transform(lon, lat)
     x1 = x + res
     y1 = y - res
-    lon1, lat1 =  transformer_meter_to_degree.transform(x1, y1)
-    res_x = abs(lon1 -lon)
+    lon1, lat1 = transformer_meter_to_degree.transform(x1, y1)
+    res_x = abs(lon1 - lon)
     res_y = abs(lat - lat1)
 
     ds.close()
 
     # resample infile with res_x and rex_y in degree
 
-    '''
+    """
     options = gdal.WarpOptions(
         format='GTiff',
         srcSRS='EPSG:4326',
@@ -1023,19 +1026,19 @@ def resample_image_with_wgs84_by_res(infile, outfile, res=3.0):
         targetAlignedPixels=False,
     )
     gdal.Warp(outfile, infile, options=options)
-    '''
+    """
 
-    gdal.Translate(
-        outfile,
-        infile,
-        xRes=res_x,
-        yRes=res_y,
-        resampleAlg=gdal.GRA_Bilinear,
-        format="GTiff"
-    )
+    gdal.Translate(outfile, infile, xRes=res_x, yRes=res_y, resampleAlg=gdal.GRA_Bilinear, format="GTiff")
 
 
-def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpoly: Polygon, buffersize:float = 0.01, embed_demtype:str = 'Copernicus 30m', lidar_upscale_res:float = 0.5):
+def download_lidar_dem_for_footprint(
+    lidar_dem_orig: Path,
+    dem_path: Path,
+    slcpoly: Polygon,
+    buffersize: float = 0.01,
+    embed_demtype: str = 'Copernicus 30m',
+    lidar_upscale_res: float = 0.5,
+):
     """extend the original lidar dem to the extent defined with polygon slcpoly, fill with Copernicus 30m data
 
     Parameters
@@ -1079,7 +1082,7 @@ def download_lidar_dem_for_footprint(lidar_dem_orig: Path, dem_path: Path, slcpo
         if tmp_dem.exists():
             tmp_dem.unlink()
 
-        dem1.download_opera_dem_for_footprint(tmp_dem, envelope, buffer = 0)
+        dem1.download_opera_dem_for_footprint(tmp_dem, envelope, buffer=0)
         # if the 30m DEM is based on geoid EGM2008, need to convert to based on ellipsoid
         dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
 

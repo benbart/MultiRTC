@@ -45,7 +45,7 @@ def convert_las_2_dem(input_las_file, output_dem_file, resolution: float = 1.0):
     # {"type": "filters.reprojection", "in_srs": f'EPSG:{epsg_code}', "out_srs": "EPSG:4326"},
     # {"type": "filters.expression",  "expression": "Classification == 2"},
 
-    '''
+    """
     pipeline_obj = [
         {'type': 'readers.las', 'filename': input_las_file},
         {'type': 'filters.smrf'},
@@ -58,19 +58,14 @@ def convert_las_2_dem(input_las_file, output_dem_file, resolution: float = 1.0):
             'resolution': resolution,
         },
     ]
-    '''
+    """
 
     pipeline_obj = [
-    {
-        'type': 'readers.las', 'filename': input_las_file
-    },
+    { 'type': 'readers.las', 'filename': input_las_file},
     {
         'type': 'filters.smrf',
     },
-    {
-        'type': 'filters.range',
-        'limits': 'Classification[2:2]'
-    },
+    {'type': 'filters.range', 'limits': 'Classification[2:2]'},
     {
         'type': 'writers.gdal',
         'gdaldriver': 'GTiff',
@@ -126,6 +121,7 @@ def main():
     # example las file: 20250523-1602_uaf_full_cloud.laz
     convert_las_2_dem(args.input, args.output, args.resolution)
     # fill_dem("/tmp/dem.tif", args.output)
+
 
 if __name__ == '__main__':
     main()
