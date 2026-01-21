@@ -1,19 +1,19 @@
 """Create an RTC dataset for a multiple satellite platforms"""
 
 import argparse
-import sys
 import glob
+import sys
+
 
 sys.path.remove(sys.path[0])
 from pathlib import Path
-from sarpy.utils import convert_to_sicd
-import numpy as np
 
+import numpy as np
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
+from sarpy.utils import convert_to_sicd
 
-from multirtc import dem1
-from multirtc import dem2
+from multirtc import dem1, dem2
 from multirtc.base import Slc
 from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions

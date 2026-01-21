@@ -1,9 +1,9 @@
-from argparse import ArgumentParser
 import json
-import rasterio
-from rasterio.fill import fillnodata
+from argparse import ArgumentParser
 
 import pdal
+import rasterio
+from rasterio.fill import fillnodata
 
 
 def get_las_crs(input_las_file):

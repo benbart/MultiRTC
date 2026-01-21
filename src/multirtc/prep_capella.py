@@ -1,9 +1,11 @@
 from pathlib import Path
+
 from osgeo import gdal
 
 from multirtc import dem
-from multirtc.sicd import SicdRzdSlc
 from multirtc.dem2 import process_dem
+from multirtc.sicd import SicdRzdSlc
+
 
 gdal.UseExceptions()
 
