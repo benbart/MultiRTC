@@ -14,7 +14,6 @@ import numpy as np
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
 
-from multirtc import dem
 from multirtc import dem1
 from multirtc import dem2
 from multirtc.base import Slc
@@ -23,7 +22,6 @@ from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
 
-from multirtc.preprocess import subset_sicdfile
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
 

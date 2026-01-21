@@ -1,4 +1,3 @@
-import isce3
 import numpy as np
 from shapely.geometry import Polygon, box
 import rasterio
@@ -6,6 +5,8 @@ from rasterio.mask import mask
 import geopandas as gpd
 from pathlib import Path
 # from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
+
+import isce3
 
 
 def get_point_epsg(lat: float, lon: float) -> int:

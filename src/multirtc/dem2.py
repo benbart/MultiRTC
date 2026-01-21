@@ -1,30 +1,25 @@
 from typing import Any
-import os
 import sys
-from collections.abc import Generator
 from pathlib import Path
 import shutil
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import boto3
-from botocore.config import Config
-import subprocess
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_Update
-import numpy as np
 import shapely.geometry
 import geojson
 import json
 import geopandas as gpd
 import subprocess
 import rasterio
+from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.fill import fillnodata
 import numpy as np
 from rasterio.transform import Affine
 from rasterio.mask import mask
-from rasterio.warp import calculate_default_transform, reproject, Resampling
 from shapely.geometry import shape, LinearRing, MultiPolygon, Polygon, box
 import pystac_client
 from sarpy.io.complex.converter import conversion_utility
@@ -52,8 +47,7 @@ def reproject_to_4326(in_raster: Path):
     srs = osr.SpatialReference(wkt=in_info['coordinateSystem']['wkt'])
     if srs.GetAuthorityCode(None) != '4326':
         tmp_raster = in_raster.rename(in_raster.parent.joinpath('tmp.tif'))
-        warp = gdal.Warp(in_raster, tmp_raster, dstSRS='EPSG:4326', resampleAlg='near')
-        warp = None  # Closes the files
+        gdal.Warp(in_raster, tmp_raster, dstSRS='EPSG:4326', resampleAlg='near')
 
 
 def convert_to_ellipsoid_height(dem_file: Path, geoid) -> None:
@@ -145,30 +139,30 @@ def get_geodata_meta(geodata_geojson):
     try:
         client.download_file(bucket_name, s3_object_key, f'/tmp/{file}')
         return f'/tmp/{file}'
-    except Exception as e:
+    except Exception:
         return None
 
 
 def fill_gap_of_vrt(input_vrt: str, output_tif: str, max_search_distance: float = 100, smoothing_iterations: int = 0):
-    with (rasterio.open(input_vrt) as src):
+    with rasterio.open(input_vrt) as src:
         image = src.read()
         profile = src.profile
         # Identify nodata pixels (assuming nodata is defined in the source, typically 0 or -9999)
         # If your source files don't have a nodata value set, you may need to define one explicitly
-        if src.nodata is not None:
-            mask = image == src.nodata
-        else:
-            # If no nodata value is set, create a mask for existing data
-            # The 'fillnodata' function expects a mask where 0 means fill, 1 means keep
-            mask = np.ones(image.shape, dtype=np.uint8) * 255  # all valid initially
+        # if src.nodata is not None:
+        #   mask = image == src.nodata
+        # else:
+        #  If no nodata value is set, create a mask for existing data
+        #  The 'fillnodata' function expects a mask where 0 means fill, 1 means keep
+        #  mask = np.ones(image.shape, dtype=np.uint8) * 255  # all valid initially
 
         # Fill holes for each band
         for i in range(src.count):
             # The mask needs to be 0 for areas to fill and 1 for valid data
             band_mask = (
-                    (image[i] != src.nodata).astype(np.uint8)
-                    if src.nodata is not None
-                    else np.ones(image[i].shape, dtype=np.uint8)
+                (image[i] != src.nodata).astype(np.uint8)
+                if src.nodata is not None
+                else np.ones(image[i].shape, dtype=np.uint8)
             )
             # Fill the nodata regions using interpolation
             # max_search_distance can be adjusted based on the gap size
@@ -178,7 +172,7 @@ def fill_gap_of_vrt(input_vrt: str, output_tif: str, max_search_distance: float 
             image[i] = filled_band
 
         # Update profile for the new output file
-        profile.update(driver="GTiff", nodata=src.nodata)  # Keep the original nodata value if desired
+        profile.update(driver='GTiff', nodata=src.nodata)  # Keep the original nodata value if desired
 
         with rasterio.open(output_tif, 'w', **profile) as dst:
             dst.write(image)
@@ -199,7 +193,6 @@ def download_dem_file(row, out_dir):
     zone = seg2[0:2]
     nume = seg2[2:4]
     file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
-    file_tmp = f'{str(Path(file).stem)}_tmp.tif'
     s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
     client.download_file(bucket_name, s3_object_key, f'{out_dir}/{file}')
     return Path(f'{out_dir}/{file}')
@@ -216,7 +209,8 @@ def download_geodata_cooperative_dem_for_footprint(
         footprint: Polygon representing the area of interest.
         buffer: Buffer distance in degrees to extend the footprint.
     """
-    output_dir = output_path.parent
+
+    # output_dir = output_path.parent
     if output_path.exists():
         output_path.unlink()
 
@@ -254,7 +248,6 @@ def download_geodata_cooperative_dem_for_footprint(
             nume = seg2[2:4]
 
             file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
-            file_tmp = f'{str(Path(file).stem)}_tmp.tif'
             s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
 
             # url = f's3://arctic-trafficability/DGED5b/UTM_{zone}/{nume}/{file}'
@@ -296,7 +289,7 @@ def download_geodata_cooperative_dem_for_footprint_local(
         footprint: Polygon representing the area of interest.
         buffer: Buffer distance in degrees to extend the footprint.
     """
-    output_dir = output_path.parent
+    # output_dir = output_path.parent
     if output_path.exists():
         output_path.unlink()
 
@@ -320,11 +313,10 @@ def download_geodata_cooperative_dem_for_footprint_local(
         input_files = []
         for index, row in intersection_rows.iterrows():
             seg2 = row['CellID']
-            zone = seg2[0:2]
-            nume = seg2[2:4]
+            # zone = seg2[0:2]
+            # nume = seg2[2:4]
             # file = f'U_{seg2}_WGS84_Ellips.tif'
             file = f'U_{seg2}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
-            file_tmp = f'{str(Path(file).stem)}_tmp.tif'
             files_found = list(dem_dir.rglob(file))
 
             if len(files_found) == 0:
@@ -729,16 +721,16 @@ def coregister_clipped_via_reffile(infile, reffile, outfile):
     src_proj = src_ds.GetProjectionRef()
     ref_proj = ref_ds.GetProjectionRef()
     x_size, y_size = ref_ds.RasterXSize, ref_ds.RasterYSize
-    nodata = ref_ds.GetRasterBand(1).GetNoDataValue()
-    gt_src = src_ds.GetGeoTransform()
+    # nodata = ref_ds.GetRasterBand(1).GetNoDataValue()
+    # gt_src = src_ds.GetGeoTransform()
     gt_ref = ref_ds.GetGeoTransform()
     xmin = min(gt_ref[0], gt_ref[0] + x_size * gt_ref[1])
     xmax = max(gt_ref[0], gt_ref[0] + x_size * gt_ref[1])
     ymin = min(gt_ref[3], gt_ref[3] + y_size * gt_ref[5])
     ymax = max(gt_ref[3], gt_ref[3] + y_size * gt_ref[5])
 
-    bbox = [xmin, ymin, xmax, ymax]
-    poly = box(*bbox)
+    # bbox = [xmin, ymin, xmax, ymax]
+    # poly = box(*bbox)
 
     buff = 120.0
     bbox_buff = [xmin - buff * gt_ref[1], ymin + buff * gt_ref[5], xmax + buff * gt_ref[1], ymax - buff * gt_ref[5]]
@@ -780,8 +772,6 @@ def coregister(infile, reffile, outfile):
     ref_ds = gdal.Open(reffile)
     src_proj = src_ds.GetProjectionRef()
     ref_proj = ref_ds.GetProjectionRef()
-    x_size, y_size = ref_ds.RasterXSize, ref_ds.RasterYSize
-    # nodata = ref_ds.GetRasterBand(1).GetNoDataValue()
     gt_ref = ref_ds.GetGeoTransform()
 
     # resample
@@ -844,9 +834,6 @@ def fill_lidar_dem_with_other_dem(lidar_dem, coregfile):
 
 
 def reproject_raster_via_rasterio(src_file, dst_file, dst_crs: str = 'EPSG:4326'):
-    import rasterio
-    from rasterio.warp import calculate_default_transform, reproject, Resampling
-
     # Define the source and destination CRSs
     # The source CRS is a compound CRS, which can be defined in a proj string or a specific EPSG if available.
     # For this example, let's assume it's a compound CRS that can be represented by a custom proj string.
@@ -942,7 +929,7 @@ def produce_lidar_dem(infile, outfile, bbox=None, bandnum=1):
     clip_raster_by_poly(infile, outfile, bandnum=bandnum, poly=poly)
     reproject_to_4326(Path(outfile))
     set_nodata(outfile, nodata=0.0)
-    convert_to_ellipsoid_height(Path(outfile), geoid)
+    convert_to_ellipsoid_height(Path(outfile), egm2008)
 
 
 def resample_to_res(dem_in: str, dem_out: str, res=3.0) -> Any:
@@ -1028,7 +1015,7 @@ def resample_image_with_wgs84_by_res(infile, outfile, res=3.0):
     gdal.Warp(outfile, infile, options=options)
     """
 
-    gdal.Translate(outfile, infile, xRes=res_x, yRes=res_y, resampleAlg=gdal.GRA_Bilinear, format="GTiff")
+    gdal.Translate(outfile, infile, xRes=res_x, yRes=res_y, resampleAlg=gdal.GRA_Bilinear, format='GTiff')
 
 
 def download_lidar_dem_for_footprint(
@@ -1090,7 +1077,7 @@ def download_lidar_dem_for_footprint(
         tmp_dem = input_path / 'tmp_dem_3m.tif'
         if tmp_dem.exists():
             tmp_dem.unlink()
-        download_geodata_cooperative_dem_for_footprint(tmp_dem, envelope, buffer = 0)
+        download_geodata_cooperative_dem_for_footprint(tmp_dem, envelope, buffer=0)
 
     # clip with envelope
     tmp_dem_clipped = tmp_dem.parent / f'{str(tmp_dem.stem)}_clipped.tif'

@@ -1,7 +1,6 @@
 from datetime import timedelta
-from pathlib import Path
 
-import isce3
+from pathlib import Path
 import numpy as np
 import pyproj
 from numpy.polynomial.polynomial import polyval2d
@@ -9,6 +8,7 @@ from osgeo import gdal
 from sarpy.io.complex.sicd import SICDReader
 from shapely.geometry import Point, Polygon, box
 import geopandas as gpd
+import isce3
 
 from multirtc import define_geogrid
 from multirtc.base import Slc, print_wkt, to_isce_datetime
@@ -432,7 +432,7 @@ class SicdPfaSlc(Slc, SicdSlc):
 
     def create_geogrid(
         self, spacing_meters: float, dem_path: Path, bbox: list = None
-) -> isce3.product.GeoGridParameters:
+    ) -> isce3.product.GeoGridParameters:
         """subset does not work for PFA format, so even if user input bbox, does not do subset"""
         return define_geogrid.generate_geogrids(self, spacing_meters, self.local_epsg, dem_path=dem_path)
 

@@ -1,22 +1,20 @@
 from pathlib import Path
 import numpy as np
+
 from sarpy.io.complex.converter import conversion_utility
 from sarpy.utils.chip_sicd import create_chip
 from sarpy.geometry import point_projection
 from sarpy.io.complex.sicd import SICDReader, SICDWriter
-
 # from sarpy.io.complex.SICD import open_sicd
 from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground, image_to_ground_geo
 # from sarpy.geometry.point_projection import image_to_ground_geo
 from sarpy.geometry.geocoords import ecf_to_geodetic
-
 from sarpy.io.complex.sicd_elements.GeoData import GeoDataType
 from sarpy.io.complex.sicd_elements.blocks import LatLonRestrictionType
-
 import pandas as pd
 import geopandas as gpd
+from shapely.geometry import Point
 
-from shapely.geometry import Polygon, Point
 
 def getrowcol(sicdfile, bbox):
     """
@@ -131,14 +129,13 @@ def imagecorners(scidfile, output_filename):
     lrlc = (meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.ImageCorners.LRLC[0])
     lrfc = (meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.ImageCorners.LRFC[0])
 
-    frfc_llh = (meta.GeoData.ImageCorners.FRFC[0], meta.GeoData.ImageCorners.FRFC[1], meta.GeoData.SCP.LLH.HAE)
-    frlc_llh = (meta.GeoData.ImageCorners.FRLC[0], meta.GeoData.ImageCorners.FRLC[1], meta.GeoData.SCP.LLH.HAE)
-    lrlc_llh = (meta.GeoData.ImageCorners.LRLC[0], meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.SCP.LLH.HAE)
-    lrfc_llh = (meta.GeoData.ImageCorners.LRFC[0], meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.SCP.LLH.HAE)
+    # frfc_llh = (meta.GeoData.ImageCorners.FRFC[0], meta.GeoData.ImageCorners.FRFC[1], meta.GeoData.SCP.LLH.HAE)
+    # frlc_llh = (meta.GeoData.ImageCorners.FRLC[0], meta.GeoData.ImageCorners.FRLC[1], meta.GeoData.SCP.LLH.HAE)
+    # lrlc_llh = (meta.GeoData.ImageCorners.LRLC[0], meta.GeoData.ImageCorners.LRLC[1], meta.GeoData.SCP.LLH.HAE)
+    # lrfc_llh = (meta.GeoData.ImageCorners.LRFC[0], meta.GeoData.ImageCorners.LRFC[1], meta.GeoData.SCP.LLH.HAE)
 
-    ground_points = [frfc, frlc, lrlc, lrfc]
-
-    ground_points_llh = [frfc_llh, frlc_llh, lrlc_llh, lrfc_llh]
+    # ground_points = [frfc, frlc, lrlc, lrfc]
+    # ground_points_llh = [frfc_llh, frlc_llh, lrlc_llh, lrfc_llh]
 
     point_data = {
         'name': ['frfc', 'frlc', 'lrlc', 'lrfc'],
@@ -153,18 +150,15 @@ def imagecorners(scidfile, output_filename):
     gdf = gdf.set_crs('EPSG:4326')
     gdf.to_file(output_filename, driver='GeoJSON')
 
-    frfci = (meta.ImageData.FirstRow, meta.ImageData.FirstCol)
-    frlci = (meta.ImageData.FirstRow,meta.ImageData.NumCols)
-    lrlci = (meta.ImageData.NumRows, meta.ImageData.NumCols)
-    lrfci = (meta.ImageData.NumRows, meta.ImageData.FirstCol)
+    # frfci = (meta.ImageData.FirstRow, meta.ImageData.FirstCol)
+    # frlci = (meta.ImageData.FirstRow, meta.ImageData.NumCols)
+    # lrlci = (meta.ImageData.NumRows, meta.ImageData.NumCols)
+    # lrfci = (meta.ImageData.NumRows, meta.ImageData.FirstCol)
 
-    img_points = [frfci, frlci, lrlci, lrfci]
-
-    ecf_points = image_to_ground(img_points, meta)
-
-    llh_points = ecf_to_geodetic(ecf_points)
-
-    llh_points_2 = image_to_ground_geo(img_points, meta)
+    # img_points = [frfci, frlci, lrlci, lrfci]
+    # ecf_points = image_to_ground(img_points, meta)
+    # llh_points = ecf_to_geodetic(ecf_points)
+    # llh_points_2 = image_to_ground_geo(img_points, meta)
 
 
 def subset_sicdfile_3(input_file, bbox, output_file):
@@ -179,7 +173,7 @@ def subset_sicdfile_3(input_file, bbox, output_file):
     # Format: (min_lon, min_lat, max_lon, max_lat) - standard for some tools
     # Sarpy functions expect (Lat, Lon, HAE) order
     # target_bounds = [-118.4, 34.1, -118.3, 34.2]
-    assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
+    # assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
     hae = sicd_structure.GeoData.SCP.LLH.HAE
 
     # 3. Define the four corners of the geographic box in Sarpy format (Lat, Lon, HAE)
@@ -264,7 +258,7 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     # Format: (min_lon, min_lat, max_lon, max_lat) - standard for some tools
     # Sarpy functions expect (Lat, Lon, HAE) order
     # target_bounds = [-118.4, 34.1, -118.3, 34.2]
-    assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
+    # assumed_hae = 0.0  # Height Above Ellipsoid (meters) - adjust as needed
     hae = meta_src.GeoData.SCP.LLH.HAE
 
     # 3. Define the four corners of the geographic box in Sarpy format (Lat, Lon, HAE)
@@ -380,7 +374,7 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     )
 
     # Project these corners to ECF coordinates using the *original* metadata's projection model
-    corners_ecf = image_to_ground(corners_orig, meta_src)
+    # corners_ecf = image_to_ground(corners_orig, meta_src)
 
     # Update the CornerPoints in the subset metadata object
     """
