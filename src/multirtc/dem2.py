@@ -10,7 +10,6 @@ from pyproj.database import query_utm_crs_info
 from osgeo import gdal, ogr, osr
 from osgeo.gdalconst import GA_Update
 import shapely.geometry
-import geojson
 import json
 import geopandas as gpd
 import subprocess
@@ -22,8 +21,8 @@ from rasterio.transform import Affine
 from rasterio.mask import mask
 from shapely.geometry import MultiPolygon, Polygon, box
 import pystac_client
-from sarpy.io.complex.converter import conversion_utility
-from sarpy.utils.chip_sicd import create_chip
+# from sarpy.io.complex.converter import conversion_utility
+# from sarpy.utils.chip_sicd import create_chip
 
 from multirtc import dem, dem1
 

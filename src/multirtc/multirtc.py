@@ -3,6 +3,7 @@
 import argparse
 import sys
 import glob
+
 sys.path.remove(sys.path[0])
 from pathlib import Path
 from sarpy.utils import convert_to_sicd
