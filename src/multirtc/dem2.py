@@ -20,7 +20,7 @@ from rasterio.fill import fillnodata
 import numpy as np
 from rasterio.transform import Affine
 from rasterio.mask import mask
-from shapely.geometry import shape, LinearRing, MultiPolygon, Polygon, box
+from shapely.geometry import MultiPolygon, Polygon, box
 import pystac_client
 from sarpy.io.complex.converter import conversion_utility
 from sarpy.utils.chip_sicd import create_chip
@@ -383,7 +383,7 @@ def clip_and_set_nodata(input_dem: str, polygon: shapely.geometry.Polygon, outpu
 
     """
     with rasterio.open(input_dem) as src:
-        gdf84 = gpd.GeoSeries([polygon], crs=f'EPSG:4326')
+        gdf84 = gpd.GeoSeries([polygon], crs='EPSG:4326')
         src_wkt = src.profile['crs'].to_wkt()
         gdf_src = gdf84.to_crs(src_wkt)
         polygon_src = gdf_src.iloc[0]
@@ -559,7 +559,7 @@ def extend_dem_to_polygon(input_dem: str, poly: shapely.geometry.Polygon, output
     Returns:
 
     """
-    gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+    gdf84 = gpd.GeoSeries([poly], crs='EPSG:4326')
     src = rasterio.open(input_dem)
     src_epsg = src.profile['crs'].to_epsg()
     gdf_src = gdf84.to_crs(f'EPSG:{src_epsg}')
@@ -605,7 +605,7 @@ def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1,
         Path(output_raster).unlink()
 
     if poly:
-        gdf84 = gpd.GeoSeries([poly], crs=f'EPSG:4326')
+        gdf84 = gpd.GeoSeries([poly], crs='EPSG:4326')
         src = rasterio.open(input_raster)
         crs = CRS.from_wkt(src.profile['crs'].to_wkt())
         if crs.is_compound:
@@ -880,7 +880,7 @@ def extend_lidar_dem_with_other_dem(lidar_dem, coregfile):
     ds = gdal.Open(lidar_dem)
     gt = ds.GetGeoTransform()
     band = ds.GetRasterBand(1)
-    nodata = band.GetNoDataValue()
+    # nodata = band.GetNoDataValue()
     data = band.ReadAsArray()
     mask = band.GetMaskBand().ReadAsArray()
     xsize, ysize = ds.RasterXSize, ds.RasterYSize

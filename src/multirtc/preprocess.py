@@ -2,15 +2,17 @@ from pathlib import Path
 import numpy as np
 
 from sarpy.io.complex.converter import conversion_utility
-from sarpy.utils.chip_sicd import create_chip
+# from sarpy.utils.chip_sicd import create_chip
 from sarpy.geometry import point_projection
 from sarpy.io.complex.sicd import SICDReader, SICDWriter
 # from sarpy.io.complex.SICD import open_sicd
-from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground, image_to_ground_geo
+
+from sarpy.geometry.point_projection import ground_to_image_geo, image_to_ground
 # from sarpy.geometry.point_projection import image_to_ground_geo
+
 from sarpy.geometry.geocoords import ecf_to_geodetic
-from sarpy.io.complex.sicd_elements.GeoData import GeoDataType
-from sarpy.io.complex.sicd_elements.blocks import LatLonRestrictionType
+# from sarpy.io.complex.sicd_elements.GeoData import GeoDataType
+# from sarpy.io.complex.sicd_elements.blocks import LatLonRestrictionType
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
@@ -364,14 +366,14 @@ def subset_sicdfile_5(sicdfile, bbox, outfile):
     # meta.define_geo_image_corners(override=True)
 
     # update ImageArea
-    corners_orig = np.array(
-        [
-            [min_row, min_col],  # Upper-Left (UL)
-            [min_row, max_col],  # Upper-Right (UR)
-            [max_row, max_col],  # Lower-Right (LR)
-            [max_row, min_col],  # Lower-Left (LL)
-        ]
-    )
+    # corners_orig = np.array(
+    #     [
+    #         [min_row, min_col],  # Upper-Left (UL)
+    #         [min_row, max_col],  # Upper-Right (UR)
+    #         [max_row, max_col],  # Lower-Right (LR)
+    #         [max_row, min_col],  # Lower-Left (LL)
+    #     ]
+    # )
 
     # Project these corners to ECF coordinates using the *original* metadata's projection model
     # corners_ecf = image_to_ground(corners_orig, meta_src)

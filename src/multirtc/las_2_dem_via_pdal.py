@@ -1,8 +1,9 @@
 from argparse import ArgumentParser
 import json
-import pdal
 import rasterio
 from rasterio.fill import fillnodata
+
+import pdal
 
 
 def get_las_crs(input_las_file):
@@ -60,7 +61,7 @@ def convert_las_2_dem(input_las_file, output_dem_file, resolution: float = 1.0):
     """
 
     pipeline_obj = [
-        { 'type': 'readers.las', 'filename': input_las_file},
+        {'type': 'readers.las', 'filename': input_las_file},
         {
             'type': 'filters.smrf',
         },

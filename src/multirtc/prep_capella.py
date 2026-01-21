@@ -1,6 +1,4 @@
 from pathlib import Path
-from typing import Optional
-
 from osgeo import gdal
 
 from multirtc import dem

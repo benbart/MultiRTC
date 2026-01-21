@@ -3,10 +3,7 @@
 import argparse
 import sys
 import glob
-
 sys.path.remove(sys.path[0])
-
-# from shapely.geometry import Polygon, box
 from pathlib import Path
 from sarpy.utils import convert_to_sicd
 import numpy as np

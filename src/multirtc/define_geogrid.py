@@ -1,11 +1,9 @@
 import numpy as np
+from pathlib import Path
 from shapely.geometry import Polygon, box
 import rasterio
 from rasterio.mask import mask
 import geopandas as gpd
-from pathlib import Path
-# from multirtc.sicd import SicdRzdSlc, SicdPfaSlc
-
 import isce3
 
 
