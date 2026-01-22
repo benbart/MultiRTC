@@ -1,6 +1,7 @@
 from datetime import timedelta
 from pathlib import Path
 
+import geopandas as gpd
 import isce3
 import numpy as np
 import pyproj
@@ -8,7 +9,6 @@ from numpy.polynomial.polynomial import polyval2d
 from osgeo import gdal
 from sarpy.io.complex.sicd import SICDReader
 from shapely.geometry import Point, Polygon, box
-import geopandas as gpd
 
 from multirtc import define_geogrid
 from multirtc.base import Slc, print_wkt, to_isce_datetime

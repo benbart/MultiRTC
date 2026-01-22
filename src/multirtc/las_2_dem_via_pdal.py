@@ -1,9 +1,9 @@
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 import json
+from argparse import ArgumentParser
+
 import pdal
 import rasterio
 from rasterio.fill import fillnodata
-import numpy as np
 
 
 def get_las_crs(input_las_file):
@@ -34,34 +34,38 @@ def get_las_crs(input_las_file):
 
 def convert_las_2_dem(input_las_file, output_dem_file, resolution: float = 1.0):
     # resolution = 1.0  # Desired resolution of the DEM in meters (or units of the input data)
-
     # Create a PDAL pipeline as a JSON string
     # This pipeline reads the LAS file, optionally filters for ground points (classification 2),
     # and then writes a raster (DEM) using the writers.gdal stage.
 
     # stage filter
     # {{"type": "filters.range","limits": "Classification[2:2]"}},
-
     # epsg_code = get_las_crs(input_las_file)
-
-    '''
-    pipeline_json = f"""
-    [
-        {{"type": "readers.las","filename": "{input_las_file}"}},
-        {{"type": "writers.gdal", "gdaldriver": "GTiff",
-        "filename": "{output_dem_file}","output_type": "all",
-        "resolution": {resolution}
-        }}
-    ]
-    """
-    '''
     # {"type": "filters.range", "limits": "Classification[2:2]"},
     # {"type": "filters.reprojection", "in_srs": f'EPSG:{epsg_code}', "out_srs": "EPSG:4326"},
     # {"type": "filters.expression",  "expression": "Classification == 2"},
 
+    """
     pipeline_obj = [
         {'type': 'readers.las', 'filename': input_las_file},
         {'type': 'filters.smrf'},
+        {'type': 'filters.range','limits': 'Classification[2:2]'},
+        {
+            'type': 'writers.gdal',
+            'gdaldriver': 'GTiff',
+            'filename': output_dem_file,
+            'output_type': 'mean',
+            'resolution': resolution,
+        },
+    ]
+    """
+
+    pipeline_obj = [
+        {'type': 'readers.las', 'filename': input_las_file},
+        {
+            'type': 'filters.smrf',
+        },
+        {'type': 'filters.range', 'limits': 'Classification[2:2]'},
         {
             'type': 'writers.gdal',
             'gdaldriver': 'GTiff',

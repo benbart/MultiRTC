@@ -178,7 +178,7 @@ def download_opera_dem_for_footprint(output_path: Path, footprint: Polygon, buff
     """
     output_dir = output_path.parent
     if output_path.exists():
-        return output_path
+        output_path.unlink()
 
     footprint = box(*footprint.buffer(buffer).bounds)
     footprints = check_antimeridean(footprint)
@@ -188,7 +188,7 @@ def download_opera_dem_for_footprint(output_path: Path, footprint: Polygon, buff
     urls = [get_dem_granule_url(lat, lon) for lat, lon in latlon_pairs]
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-         executor.map(lambda url: download_file(url, str(output_dir)), urls)
+        executor.map(lambda url: download_file(url, str(output_dir)), urls)
 
     # [download_file(url, str(output_dir)) for url in urls]
 
