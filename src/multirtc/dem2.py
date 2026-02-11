@@ -487,22 +487,25 @@ def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
     linear_data = np.maximum(linear_data, 1e-10)  # Clamp values to avoid issues
     db_data = 10 * np.log10(linear_data / ref)
 
+    # for simplicity, set -100 to be np.nan
+    db_data[db_data == -100] = np.nan
+
     # Set the nodata values in the new array back to the specified nodata value
-    if nodata:
-        # Replace NaN with the nodata value if it was set
-        if ~np.isnan(nodata):
-            db_data[np.isnan(db_data)] = nodata
-    elif src_nodata:
-        nodata = src_nodata
-        if ~np.isnan(src_nodata):
-            db_data[np.isnan(db_data)] = nodata
-    else:
-        nodata = np.nan
+    # if nodata:
+    #     # Replace NaN with the nodata value if it was set
+    #     if ~np.isnan(nodata):
+    #         db_data[np.isnan(db_data)] = nodata
+    # elif src_nodata:
+    #     nodata = src_nodata
+    #     if ~np.isnan(src_nodata):
+    #         db_data[np.isnan(db_data)] = nodata
+    # else:
+    #     nodata = np.nan
 
     # Update the profile for the output raster
     profile.update(
         dtype=np.float32,  # dB data should be float
-        nodata=nodata,
+        nodata=np.nan,
         compress='lzw',  # Optional: add compression
     )
 
