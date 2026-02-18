@@ -1,11 +1,6 @@
 """Create an RTC dataset for a multiple satellite platforms"""
-
 import argparse
 import glob
-import sys
-
-
-sys.path.remove(sys.path[0])
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +8,7 @@ from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
 from sarpy.utils import convert_to_sicd
 
-from multirtc import dem1, dem2
+from multirtc import create_dem
 from multirtc.base import Slc
 from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
@@ -86,6 +81,54 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
+    platform: str, granule: str, resolution: int, subset: list, work_dir: Path, dem_path: Path | None = None, apply_rtc=True
+) -> None:
+    """Create an RTC or Geocoded dataset using the OPERA algorithm.
+
+    Args:
+        platform: Platform type (e.g., 'UMBRA').
+        granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
+        resolution: Resolution of the output RTC (in meters).
+        work_dir: Working directory for processing.
+        dem_path: Path to the DEM to use for processing. If None, the NISAR DEM will be downloaded.
+        apply_rtc: If True perform radiometric correction; if False, only geocode.
+    """
+    input_dir, output_dir = prep_dirs(work_dir)
+    slc = get_slc(platform, granule, input_dir)
+    poly = slc.footprint
+    if dem_path is None:
+        dem_path = input_dir / 'dem.tif'
+        create_dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
+    create_dem.validate_dem(dem_path, slc.footprint)
+    geogrid = slc.create_geogrid(spacing_meters=resolution, dem_path=dem_path, bbox=subset)
+    if slc.supports_rtc:
+        opts = RtcOptions(
+            dem_path=str(dem_path),
+            output_dir=str(output_dir),
+            apply_rtc=apply_rtc,
+            resolution=resolution,
+            apply_bistatic_delay=slc.supports_bistatic_delay,
+            apply_static_tropo=slc.supports_static_tropo,
+        )
+        rtc(slc, geogrid, opts)
+        if isinstance(slc, SicdRzdSlc) and len(subset) != 0:
+            outfile_prex = 'subset'
+        else:
+            outfile_prex = 'full'
+        rtcfile = output_dir / f'{slc.filepath.stem}.tif'
+        if rtcfile.exists():
+            rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_{outfile_prex}_{dem_path.stem}_clip_nodata.tif'
+            rtcfile_db = rtcfile_clip.parent / f'{rtcfile_clip.stem}_db.tif'
+            create_dem.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata=np.nan)
+            create_dem.linear_to_db(str(rtcfile_clip), str(rtcfile_db))
+    else:
+        raise NotImplementedError(
+            'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
+            'https://github.com/forrestfwilliams/MultiRTC/pkgs/container/multirtc'
+        )
+
+
+def run_multirtc_comb(
     platform: str,
     granule: str,
     resolution: float,
@@ -130,23 +173,23 @@ def run_multirtc(
     if demtype == 'Copernicus 30m':
         # surface mode (DSM), height above wgs84 ellipsoid
         dem_path = input_dir / 'dem_30d0.tif'
-        dem1.download_opera_dem_for_footprint(dem_path, poly)
-        dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
+        create_dem.download_opera_dem_for_footprint(dem_path, poly)
+        create_dem.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
     elif demtype == 'Geodata 3m':
         # terrain mode (DTM), height above geoid EMG96
         dem_path = input_dir / 'dem_3d0_ellipsoid.tif'
-        dem2.download_geodata_cooperative_dem_for_footprint_local(dem_path, poly, buffer=0.1)
+        create_dem.download_geodata_cooperative_dem_for_footprint_local(dem_path, poly, buffer=0.1)
         # dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly, buffer=0.1)
     elif demtype == 'ArcticDEM 2m':
         # surface mode, height above the wgs84 ellipsoid
         dem_path = input_dir / 'dem_2d0.tif'
-        dem2.download_2m_arcticdem(dem_path, poly)
+        create_dem.download_2m_arcticdem(dem_path, poly)
     elif demtype == 'Lidar 0.5m':
         # choose ground in the cloud point to get the terrain mode, height above the wgs84 ellipsoid
         dem_path = input_dir / 'dem_0d5.tif'
         # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
         lidar_dem_orig = demfile
-        dem2.download_lidar_dem_for_footprint(
+        create_dem.download_lidar_dem_for_footprint(
             lidar_dem_orig,
             dem_path,
             poly,
@@ -158,7 +201,7 @@ def run_multirtc(
         print('demtype is not correct. exit 1')
         exit(1)
 
-    dem1.validate_dem(dem_path, slc.footprint)
+    create_dem.validate_dem(dem_path, slc.footprint)
 
     if isinstance(slc, SicdRzdSlc) and len(bbox) != 0:
         outfile_prex = 'subset'
@@ -184,8 +227,8 @@ def run_multirtc(
             rtcfile_clip = rtcfile.parent / f'{rtcfile.stem}_{outfile_prex}_{dem_path.stem}_clip_nodata.tif'
             rtcfile_db = rtcfile_clip.parent / f'{rtcfile_clip.stem}_db.tif'
 
-            dem2.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata=np.nan)
-            dem2.linear_to_db(str(rtcfile_clip), str(rtcfile_db))
+            create_dem.clip_and_set_nodata(str(rtcfile), poly, str(rtcfile_clip), nodata=np.nan)
+            create_dem.linear_to_db(str(rtcfile_clip), str(rtcfile_db))
     else:
         raise NotImplementedError(
             'RTC creation is not supported for this input. For polar grid support, use the multirtc docker image:\n'
@@ -197,6 +240,9 @@ def create_parser(parser):
     parser.add_argument('platform', choices=SUPPORTED, help='Platform to create RTC for')
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', type=float, help='Resolution of the output RTC (m)')
+    parser.add_argument(
+        '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
+    )
     parser.add_argument('--dem', type=Path, default=None, help='Path to the DEM to use for processing')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     return parser
@@ -207,7 +253,7 @@ def run(args):
         assert args.dem.exists(), f'DEM file {args.dem} does not exist.'
     if args.work_dir is None:
         args.work_dir = Path.cwd()
-    run_multirtc(args.platform, args.granule, args.resolution, args.work_dir, apply_rtc=True)
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir, args.dem, apply_rtc=True)
 
 
 def str2bool(v):
@@ -219,7 +265,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def main():
+def main_comb():
     """Create a RTC or geocoded dataset for a multiple satellite platforms
 
     Example command:
@@ -230,7 +276,7 @@ def main():
     parser.add_argument('granule', help='Data granule to create an RTC for.')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument(
-        '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)'
+        '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
     )
     parser.add_argument('--dem', type=Path, default=None, help='demfile')
     parser.add_argument(
@@ -255,7 +301,7 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-    run_multirtc(
+    run_multirtc_comb(
         args.platform,
         args.granule,
         args.resolution,
@@ -270,5 +316,5 @@ def main():
     )
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#    main_comb()
