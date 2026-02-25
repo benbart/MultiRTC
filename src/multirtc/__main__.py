@@ -1,6 +1,7 @@
 import argparse
 import time
-from multirtc import dem, create_dem, geocode, multirtc
+
+from multirtc import create_dem, dem, geocode, multirtc
 from multirtc.multimetric import ale, point_target, rle
 
 

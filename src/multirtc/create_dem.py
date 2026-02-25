@@ -1,13 +1,13 @@
 """Prepare an external DEM for use in MultiRTC"""
 
-import sys
 import argparse
 import glob
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from itertools import product
 from pathlib import Path
 from shutil import copyfile
-import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import boto3
@@ -15,19 +15,20 @@ import geopandas as gpd
 import numpy as np
 import pystac_client
 import rasterio
-from rasterio.fill import fillnodata
-from rasterio.mask import mask
-from rasterio.warp import Resampling, calculate_default_transform, reproject
 import shapely
 from osgeo import gdal, osr
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info
-from shapely.geometry import LinearRing, MultiPolygon, Polygon, Point, box
+from rasterio.fill import fillnodata
+from rasterio.mask import mask
+from rasterio.warp import Resampling, calculate_default_transform, reproject
 from sarpy.io.complex.sicd import SICDReader
 from sarpy.utils import convert_to_sicd
+from shapely.geometry import LinearRing, MultiPolygon, Point, Polygon, box
 
 from multirtc.fetch import download_file
+
 
 gdal.UseExceptions()
 
@@ -593,7 +594,7 @@ def download_geodata_cooperative_dem_for_tiles(output_path: Path, tilesfile, buf
     if output_path.exists():
         output_path.unlink()
 
-    with open(tilesfile, 'r') as f:
+    with open(tilesfile) as f:
         tiles = [line.rstrip() for line in f]
         tiles = list(filter(None, tiles))
 
