@@ -1211,7 +1211,6 @@ def main():
     if args.work_dir is None:
         args.work_dir = Path.cwd()
 
-
     input_dir, output_dir = prep_dirs(args.work_dir)
 
     # convert ICEYE h5 to nitf
@@ -1226,7 +1225,7 @@ def main():
     poly = meta.GeoData.ImageFootprint
 
     # slc = get_slc(platform, granule, input_dir)
-    #poly = slc.footprint
+    # poly = slc.footprint
 
     if args.demtype == 'Copernicus 30m':
         # surface mode (DSM), height above wgs84 ellipsoid

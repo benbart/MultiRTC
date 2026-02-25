@@ -37,8 +37,9 @@ def main():
     start_time = time.perf_counter()
     args.func(args)
     end_time = time.perf_counter()
-    elapsed_time = (end_time - start_time)/60.
-    print(f"The code block executed in {elapsed_time:.4f} minutes")
+    elapsed_time = (end_time - start_time) / 60.0
+    print(f'The code block executed in {elapsed_time:.4f} minutes')
+
 
 if __name__ == '__main__':
     main()

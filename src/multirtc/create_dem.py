@@ -1,4 +1,5 @@
 """Prepare an external DEM for use in MultiRTC"""
+
 import sys
 import argparse
 import glob
@@ -68,11 +69,13 @@ egm2008 = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/GEOID/us_nga_egm2008_1
 egm96 = '/home/conda/crrel/dem/egm/us_nga_egm96_15.tif'
 geoid12_alaska = '/home/conda/crrel/dem/egm/geoid12_alaska/g2012a00.tif'
 
+
 def polygon2geojsonfile(poly: shapely.geometry.Polygon, geojsonfile, crs: str = 'EPSG:4326'):
     geo_series = gpd.GeoSeries([poly])
     geo_series.crs = crs
     gdf = gpd.GeoDataFrame({'geometry': geo_series, 'id': [1]})
     gdf.to_file(geojsonfile, driver='GeoJSON')
+
 
 def read_polygon(geojsonfile):
     # geojson file only include one raw, its geometry is a Polygon
@@ -81,6 +84,7 @@ def read_polygon(geojsonfile):
     if isinstance(poly, MultiPolygon):
         poly = list(poly.geoms)[0]
     return poly
+
 
 def prep_dirs(work_dir: Path | None = None) -> tuple[Path, Path]:
     """Prepare input and output directories for processing.
@@ -284,6 +288,7 @@ def get_geodata_meta(geodata_geojson):
     except Exception:
         return None
 
+
 def fill_gap_of_vrt(input_vrt: str, output_tif: str, max_search_distance: float = 100, smoothing_iterations: int = 0):
     with rasterio.open(input_vrt) as src:
         image = src.read()
@@ -354,6 +359,7 @@ def convert_to_ellipsoid_height(dem_file: Path, geoid) -> None:
         dem_ds.GetRasterBand(1).WriteArray(dem_ma)
         dem_ds.FlushCache()
         del dem_ds
+
 
 def linear_to_db(input_path, output_path, ref=1.0, nodata=None):
     """
@@ -573,9 +579,7 @@ def download_geodata_cooperative_dem_for_footprint(
         convert_to_ellipsoid_height(output_path, egm96)
 
 
-def download_geodata_cooperative_dem_for_tiles(
-    output_path: Path, tilesfile, buffer: float = 0.02
-) -> None:
+def download_geodata_cooperative_dem_for_tiles(output_path: Path, tilesfile, buffer: float = 0.02) -> None:
     """
     Download the OPERA DEM for a given footprint and save it to the specified output path.
 
@@ -633,6 +637,7 @@ def download_geodata_cooperative_dem_for_tiles(
 
 
 # ArcticDEM 2m
+
 
 def clip_raster_by_poly(input_raster: str, output_raster: str, bandnum: int = 1, poly: Polygon = None):
     """Clip the raster by polygon
@@ -1104,9 +1109,7 @@ def create_parser(parser):
     )
     parser.add_argument('--granulefile', type=Path, default=None, help='Data granule to create an RTC for.')
     parser.add_argument('--tilesfile', type=Path, default=None, help='Data granule to create an RTC for.')
-    parser.add_argument(
-        '--aoi', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
-     )
+    parser.add_argument('--aoi', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)')
     parser.add_argument('--lidardem', type=Path, default=None, help='lidardemfile')
     parser.add_argument(
         '--embed_demtype',
@@ -1146,8 +1149,14 @@ def run(args):
         reader = SICDReader(str(granule))
         meta = reader.sicd_meta
         # The polygon boundary
-        poly = Polygon([Point(meta.GeoData.ImageCorners.FRFC[::-1]), Point(meta.GeoData.ImageCorners.FRLC[::-1]),
-                        Point(meta.GeoData.ImageCorners.LRLC[::-1]), Point(meta.GeoData.ImageCorners.LRFC[::-1])])
+        poly = Polygon(
+            [
+                Point(meta.GeoData.ImageCorners.FRFC[::-1]),
+                Point(meta.GeoData.ImageCorners.FRLC[::-1]),
+                Point(meta.GeoData.ImageCorners.LRLC[::-1]),
+                Point(meta.GeoData.ImageCorners.LRFC[::-1]),
+            ]
+        )
 
     demtype = args.demtype.replace(' ', '_').lower()
     dem_path = Path(f'{str(out_dem_file_stem)}_{demtype}.tif')
@@ -1180,6 +1189,7 @@ def run(args):
         sys.exit(1)
 
     validate_dem(dem_path, poly)
+
 
 def main():
     """create a DEM file for RTC procesing of the infile
@@ -1236,8 +1246,14 @@ def main():
     reader = SICDReader(str(granule))
     meta = reader.sicd_meta
     # The polygon boundary
-    poly = Polygon([Point(meta.GeoData.ImageCorners.FRFC[::-1]), Point(meta.GeoData.ImageCorners.FRLC[::-1]),
-                    Point(meta.GeoData.ImageCorners.LRLC[::-1]), Point(meta.GeoData.ImageCorners.LRFC[::-1])])
+    poly = Polygon(
+        [
+            Point(meta.GeoData.ImageCorners.FRFC[::-1]),
+            Point(meta.GeoData.ImageCorners.FRLC[::-1]),
+            Point(meta.GeoData.ImageCorners.LRLC[::-1]),
+            Point(meta.GeoData.ImageCorners.LRFC[::-1]),
+        ]
+    )
 
     demtype = args.demtype.replace(' ', '_')
     dem_path = Path(f'{str(out_dem_file_stem)}_{demtype}.tif')

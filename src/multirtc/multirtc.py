@@ -1,4 +1,5 @@
 """Create an RTC dataset for a multiple satellite platforms"""
+
 import argparse
 import glob
 from pathlib import Path
@@ -81,7 +82,13 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
 
 
 def run_multirtc(
-    platform: str, granule: str, resolution: int, subset: list, work_dir: Path, dem_path: Path | None = None, apply_rtc=True
+    platform: str,
+    granule: str,
+    resolution: int,
+    subset: list,
+    work_dir: Path,
+    dem_path: Path | None = None,
+    apply_rtc=True,
 ) -> None:
     """Create an RTC or Geocoded dataset using the OPERA algorithm.
 
