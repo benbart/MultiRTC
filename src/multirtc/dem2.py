@@ -1,3 +1,4 @@
+import argparse
 import json
 import shutil
 import subprocess
@@ -21,11 +22,13 @@ from rasterio.fill import fillnodata
 from rasterio.mask import mask
 from rasterio.transform import Affine
 from rasterio.warp import Resampling, calculate_default_transform, reproject
+from sarpy.io.complex.sicd import SICDReader
 from shapely.geometry import MultiPolygon, Polygon, box
 
 # from sarpy.io.complex.converter import conversion_utility
 # from sarpy.utils.chip_sicd import create_chip
-from multirtc import dem, dem1
+import multirtc
+from multirtc.multirtc import convert_h5_to_nitf, prep_dirs
 
 
 DEM_GEOJSON = '/vsicurl/https://asf-dem-west.s3.amazonaws.com/v2/cop30_20250407.geojson'
@@ -215,7 +218,7 @@ def download_geodata_cooperative_dem_for_footprint(
         output_path.unlink()
 
     footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
-    footprints = dem.check_antimeridean(footprint)
+    footprints = multirtc.dem.check_antimeridean(footprint)
     footprints = shapely.geometry.MultiPolygon(footprints)
 
     geodata_geojson = DEM_GEODATA_GEOJSON
@@ -294,7 +297,7 @@ def download_geodata_cooperative_dem_for_footprint_local(
         output_path.unlink()
 
     footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
-    footprints = dem.check_antimeridean(footprint)
+    footprints = multirtc.dem.check_antimeridean(footprint)
     footprints = shapely.geometry.MultiPolygon(footprints)
 
     meta_geojson = Path(DEM_GEODATA_GEOJSON_LOCAL)
@@ -1072,9 +1075,9 @@ def download_lidar_dem_for_footprint(
         if tmp_dem.exists():
             tmp_dem.unlink()
 
-        dem1.download_opera_dem_for_footprint(tmp_dem, envelope, buffer=0)
+        multirtc.dem1.download_opera_dem_for_footprint(tmp_dem, envelope, buffer=0)
         # if the 30m DEM is based on geoid EGM2008, need to convert to based on ellipsoid
-        dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
+        multirtc.dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
 
     else:
         tmp_dem = input_path / 'tmp_dem_3m.tif'
@@ -1126,7 +1129,7 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
     #    exit(0)
     footprint = shapely.geometry.box(*footprint.buffer(buffer).bounds)
     footprint = shapely.geometry.box(*footprint.bounds)
-    footprints = dem.check_antimeridean(footprint)
+    footprints = multirtc.dem.check_antimeridean(footprint)
     footprints = shapely.geometry.MultiPolygon(footprints)
     bbox = footprints.bounds
     cat = pystac_client.Client.open('https://stac.pgc.umn.edu/api/v1/')
@@ -1170,3 +1173,93 @@ def download_2m_arcticdem(output_path: Path, footprint: shapely.geometry.Polygon
     reproject_to_4326(output_path)
     # ArcticDEM vertical is based on WGS84 Ellipsoid, so no need to convert to ellipsoid based height
     # convert_to_ellipsoid_based_height(output_path)
+
+
+def main():
+    """get a DEM file for RTC procesing of the infile
+
+    get_dem ntf, dem_type,
+    """
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # parser.add_argument('platform', choices=SUPPORTED, help='Platform to create RTC for')
+    parser.add_argument('granule', help='Data granule to create an RTC for.')
+    # parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
+    # parser.add_argument(
+    #    '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, MAx_lon, Max_lat (degree)'
+    # )
+    parser.add_argument('--dem', type=Path, default=None, help='demfile')
+    parser.add_argument(
+        '--demtype',
+        choices=['Copernicus 30m', 'Geodata 3m', 'ArcticDEM 2m', 'Lidar 0.5m'],
+        default='Copernicus 30m',
+        help='Choose the DEM type, default is Copernicus 30m',
+    )
+    parser.add_argument(
+        '--embed_demtype',
+        choices=['Copernicus 30m', 'Geodata 3m'],
+        default='Copernicus 30m',
+        help='Choose the embeded DEM',
+    )
+    parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
+    parser.add_argument('--lidar_upscale_res', type=float, default=0.5, help='choose upscale res for lidar dem')
+    parser.add_argument('--lidar_buffer_size', type=float, default=0.01, help='buffer size for slc footprint')
+
+    args = parser.parse_args()
+
+    granule = args.granule
+
+    if args.work_dir is None:
+        args.work_dir = Path.cwd()
+
+    input_dir, output_dir = prep_dirs(args.work_dir)
+
+    # convert ICEYE h5 to nitf
+    if args.platform == 'ICEYE' and Path(args.granule).suffix == '.h5':
+        granule = convert_h5_to_nitf(str(Path(input_dir) / args.granule), str(input_dir))
+
+    # get the boundary of a sicd file
+
+    reader = SICDReader(str(input_dir / granule))
+    meta = reader.sicd_meta
+    # The polygon boundary
+    poly = meta.GeoData.ImageFootprint
+
+    # slc = get_slc(platform, granule, input_dir)
+    # poly = slc.footprint
+
+    if args.demtype == 'Copernicus 30m':
+        # surface mode (DSM), height above wgs84 ellipsoid
+        dem_path = input_dir / 'dem_30d0.tif'
+        multirtc.dem1.download_opera_dem_for_footprint(dem_path, poly)
+        multirtc.dem1.convert_to_height_above_ellipsoid(dem_path, 'EGM2008')
+    elif args.demtype == 'Geodata 3m':
+        # terrain mode (DTM), height above geoid EMG96
+        dem_path = input_dir / 'dem_3d0_ellipsoid.tif'
+        download_geodata_cooperative_dem_for_footprint_local(dem_path, poly, buffer=0.1)
+        # dem2.download_geodata_cooperative_dem_for_footprint(dem_path, poly, buffer=0.1)
+    elif args.demtype == 'ArcticDEM 2m':
+        # surface mode, height above the wgs84 ellipsoid
+        dem_path = input_dir / 'dem_2d0.tif'
+        download_2m_arcticdem(dem_path, poly)
+    elif args.demtype == 'Lidar 0.5m':
+        # choose ground in the cloud point to get the terrain mode, height above the wgs84 ellipsoid
+        dem_path = input_dir / 'dem_0d5.tif'
+        # lidar_dem_orig = Path('/home/conda/data/dem/lidar_via_eyal/20250523-1602_uaf_full_cloud_dem_pdal.tif')
+        lidar_dem_orig = args.demfile
+        download_lidar_dem_for_footprint(
+            lidar_dem_orig,
+            dem_path,
+            poly,
+            buffersize=args.lidar_buffer_size,
+            embed_demtype=args.embed_demtype,
+            lidar_upscale_res=args.lidar_upscale_res,
+        )
+    else:
+        print('demtype is not correct. exit 1')
+        exit(1)
+
+    multirtc.dem.validate_dem(dem_path, poly)
+
+
+if __name__ == '__main__':
+    main()
