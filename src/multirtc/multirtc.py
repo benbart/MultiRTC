@@ -9,6 +9,7 @@ from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
 from sarpy.utils import convert_to_sicd
 
+from hyp3lib.aws import upload_file_to_s3
 from multirtc import create_dem
 from multirtc.base import Slc
 from multirtc.create_rtc import rtc
@@ -96,6 +97,7 @@ def run_multirtc(
         platform: Platform type (e.g., 'UMBRA').
         granule: Granule name if data is available in ASF archive, or filename if granule is already downloaded.
         resolution: Resolution of the output RTC (in meters).
+        subset: [min_lon, min_lat, max_lon, max_lat], used to clip the raster. default=None
         work_dir: Working directory for processing.
         dem_path: Path to the DEM to use for processing. If None, the NISAR DEM will be downloaded.
         apply_rtc: If True perform radiometric correction; if False, only geocode.
@@ -252,6 +254,11 @@ def create_parser(parser):
     )
     parser.add_argument('--dem', type=Path, default=None, help='Path to the DEM to use for processing')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
+    # Hyp3 args:
+    parser.add_argument('--hyp3', type=str, default=None, help='Runs in Hyp3 mode')
+    parser.add_argument('--bucket', type=str, default=None, help='AWS S3 bucket HyP3 for upload the final product(s)')
+    parser.add_argument('--bucket-prefix', type=str, default=None, help='Add a bucket prefix to product(s)')
+
     return parser
 
 
@@ -260,7 +267,18 @@ def run(args):
         assert args.dem.exists(), f'DEM file {args.dem} does not exist.'
     if args.work_dir is None:
         args.work_dir = Path.cwd()
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir, args.dem, apply_rtc=True)
+    if args.hyp3 is None:
+        run_multirtc(
+            args.platform,
+            args.granule,
+            args.resolution,
+            args.subset,
+            args.work_dir,
+            args.dem,
+            apply_rtc=True,
+        )
+    else:
+        run_hyp3(args)
 
 
 def str2bool(v):
@@ -270,6 +288,38 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def run_hyp3(args: argparse.Namespace):
+    """Runs multirtc in HyP3 mode.
+
+    Args:
+        args (argparse.Namespace): Command line arguments. Must have the following attributes:
+            - bucket (str): Name of the S3 bucket
+            - bucket_prefix (str): Prefix for the S3 bucket
+            - platform (str): Satellite platform
+            - granule (str): Granule identifier
+    Raises:
+        AssertionError: If bucket or bucket_prefix is None
+    """
+
+    assert args.bucket is not None, 'Bucket name is required for Hyp3 mode'
+    assert args.bucket_prefix is not None, 'Bucket prefix is required for Hyp3 mode'
+
+    bucket = args.bucket
+    bucket_prefix = args.bucket_prefix
+
+    print(f'running multirtc in hyp3 mode with bucket={bucket} and bucket_prefix={bucket_prefix}')
+
+    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir, args.dem, apply_rtc=True)
+
+    # get list of files in output directory and run upload_file_to_s3() on them:
+    output_dir = Path(args.work_dir) / 'output'
+    files = glob.glob(str(output_dir / '*.tif'))
+    print(f'uploading files in {output_dir} to s3')
+    for file in files:
+        print(f'uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name}')
+        upload_file_to_s3(Path(file), bucket, bucket_prefix)
 
 
 def main_comb():
