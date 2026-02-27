@@ -2,7 +2,9 @@
 
 import argparse
 import glob
+import logging
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 from burst2safe.burst2safe import burst2safe
@@ -16,6 +18,14 @@ from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)'
+formatter = logging.Formatter(fmt)
+handler.setFormatter(formatter)
+log.addHandler(handler)
 
 
 SUPPORTED = ['S1', 'UMBRA', 'CAPELLA', 'ICEYE']
@@ -256,6 +266,7 @@ def create_parser(parser):
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     # Hyp3 args:
     parser.add_argument('--hyp3', type=str, default=None, help='Runs in Hyp3 mode')
+    parser.add_argument('--do-not-upload-rtc', type=str, default=None, help='Do not upload RTC to S3. Useful for dev work.')
     parser.add_argument('--bucket', type=str, default=None, help='AWS S3 bucket HyP3 for upload the final product(s)')
     parser.add_argument('--bucket-prefix', type=str, default=None, help='Add a bucket prefix to product(s)')
 
@@ -309,17 +320,33 @@ def run_hyp3(args: argparse.Namespace):
     bucket = args.bucket
     bucket_prefix = args.bucket_prefix
 
-    print(f'running multirtc in hyp3 mode with bucket={bucket} and bucket_prefix={bucket_prefix}')
+    log.info('running multirtc in hyp3 mode with bucket=%s and bucket_prefix=%s', bucket, bucket_prefix)
 
+    rtc_t0 = perf_counter()
     run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir, args.dem, apply_rtc=True)
+    log.info('RTC creation time: %.2f minutes', (perf_counter() - rtc_t0) / 60)
 
     # get list of files in output directory and run upload_file_to_s3() on them:
     output_dir = Path(args.work_dir) / 'output'
     files = glob.glob(str(output_dir / '*.tif'))
-    print(f'uploading files in {output_dir} to s3')
+
+    log.info('uploading files in %s to s3', output_dir)
+    rtc_t1 = perf_counter()
     for file in files:
-        print(f'uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name}')
-        upload_file_to_s3(Path(file), bucket, bucket_prefix)
+        if args.do_not_upload_rtc is None:
+            log.info(f'uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name}')
+            upload_file_to_s3(Path(file), bucket, bucket_prefix)
+        else:
+            log.warning(f'NOT uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name} because --do-not-upload-rtc is set')
+    log.info('upload time: %.2f minutes', (perf_counter() - rtc_t1) / 60)
+
+    # At time of this coding, Hyp3 can only classify a few filetypes as products and return them in the find_jobs()
+    # query. Unfortunately, .tif isn't one of them and .zip is. So we create an empty "zip" file to upload so we can
+    # get at least the bucket name and prefix in the output.
+    # create empty zip file in workdir:
+    empty_zip_path = Path(args.work_dir) / 'empty.zip'
+    empty_zip_path.touch()
+    upload_file_to_s3(Path(empty_zip_path), bucket, bucket_prefix)
 
 
 def main_comb():
