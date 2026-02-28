@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from time import perf_counter
 
+import boto3
 import numpy as np
 from burst2safe.burst2safe import burst2safe
 from s1reader.s1_orbit import retrieve_orbit_file
@@ -262,7 +263,7 @@ def create_parser(parser):
     parser.add_argument(
         '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
     )
-    parser.add_argument('--dem', type=Path, default=None, help='Path to the DEM to use for processing')
+    parser.add_argument('--dem', type=str, default=None, help='Path to the DEM to use for processing or S3 URI if hyp3')
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     # Hyp3 args:
     parser.add_argument('--hyp3', type=str, default=None, help='Runs in Hyp3 mode')
@@ -274,18 +275,19 @@ def create_parser(parser):
 
 
 def run(args):
-    if args.dem is not None:
-        assert args.dem.exists(), f'DEM file {args.dem} does not exist.'
+
     if args.work_dir is None:
         args.work_dir = Path.cwd()
     if args.hyp3 is None:
+        if args.dem is not None:
+            assert args.dem.exists(), f'DEM file {args.dem} does not exist.'
         run_multirtc(
             args.platform,
             args.granule,
             args.resolution,
             args.subset,
             args.work_dir,
-            args.dem,
+            Path(args.dem),
             apply_rtc=True,
         )
     else:
@@ -299,6 +301,14 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def process_s3_uri(uri: str) -> tuple[str, str]:
+    """Parse an S3 URI into bucket and key."""
+    if not uri.startswith('s3://'):
+        raise ValueError(f'Invalid S3 URI: {uri}')
+    bucket, key = uri.split('s3://')[1].split('/', 1)
+    return bucket, key
 
 
 def run_hyp3(args: argparse.Namespace):
@@ -319,26 +329,58 @@ def run_hyp3(args: argparse.Namespace):
 
     bucket = args.bucket
     bucket_prefix = args.bucket_prefix
-
     log.info('running multirtc in hyp3 mode with bucket=%s and bucket_prefix=%s', bucket, bucket_prefix)
 
     rtc_t0 = perf_counter()
-    run_multirtc(args.platform, args.granule, args.resolution, args.subset, args.work_dir, args.dem, apply_rtc=True)
-    log.info('RTC creation time: %.2f minutes', (perf_counter() - rtc_t0) / 60)
+    input_dir, output_dir = prep_dirs(args.work_dir)
+    if args.granule.startswith('s3://'):
+        # granule is not -v'd in this container, so we'll need to download it.
+        # We'll presume the dem is in s3 too
+        # Stage the granule and dem to local workdir:
+        s3 = boto3.client('s3')
+        gr_bucket, gr_key = process_s3_uri(args.granule)
+        granule_name = Path(gr_key).name
+
+        dem_bucket, dem_key = process_s3_uri(args.dem)
+        dem_name = Path(dem_key).name
+        dem_location = input_dir / dem_name
+
+        log.info('downloading granule %s to %s', args.granule, str(input_dir / granule_name))
+        s3.download_file(gr_bucket, gr_key, str(input_dir / granule_name))
+        log.info('downloading dem %s to %s', args.dem, str(dem_location))
+        s3.download_file(dem_bucket, dem_key, str(dem_location))
+    else:
+        # We presume granule is in workdir/input/granulename.ext
+        granule_name = args.granule
+        dem_name = Path(args.dem).name
+
+    rtc_t1 = perf_counter()
+    log.info('Staging data took %.2f minutes', (rtc_t1 - rtc_t0) / 60)
+
+    log.info('running multirtc with granule=%s and dem=%s', granule_name, dem_name)
+    run_multirtc(
+        args.platform,
+        granule_name,
+        args.resolution,
+        args.subset,
+        args.work_dir,
+        input_dir / dem_name,
+        apply_rtc=True,
+    )
+    log.info('RTC creation time: %.2f minutes', (perf_counter() - rtc_t1) / 60)
 
     # get list of files in output directory and run upload_file_to_s3() on them:
-    output_dir = Path(args.work_dir) / 'output'
     files = glob.glob(str(output_dir / '*.tif'))
 
     log.info('uploading files in %s to s3', output_dir)
-    rtc_t1 = perf_counter()
+    rtc_t2 = perf_counter()
     for file in files:
         if args.do_not_upload_rtc is None:
             log.info(f'uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name}')
             upload_file_to_s3(Path(file), bucket, bucket_prefix)
         else:
             log.warning(f'NOT uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name} because --do-not-upload-rtc is set')
-    log.info('upload time: %.2f minutes', (perf_counter() - rtc_t1) / 60)
+    log.info('upload time: %.2f minutes', (perf_counter() - rtc_t2) / 60)
 
     # At time of this coding, Hyp3 can only classify a few filetypes as products and return them in the find_jobs()
     # query. Unfortunately, .tif isn't one of them and .zip is. So we create an empty "zip" file to upload so we can
@@ -357,12 +399,12 @@ def main_comb():
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('platform', choices=SUPPORTED, help='Platform to create RTC for')
-    parser.add_argument('granule', help='Data granule to create an RTC for.')
+    parser.add_argument('granule', help='Data granule to create an RTC for. In Hyp3 mode, it is a s3://')
     parser.add_argument('--resolution', default=30, type=float, help='Resolution of the output RTC (m)')
     parser.add_argument(
         '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
     )
-    parser.add_argument('--dem', type=Path, default=None, help='demfile')
+    parser.add_argument('--dem', type=Path, default=None, help='DEM file. When in Hyp3 mode, it is a s3://')
     parser.add_argument(
         '--demtype',
         choices=['Copernicus 30m', 'Geodata 3m', 'ArcticDEM 2m', 'Lidar 0.5m'],
