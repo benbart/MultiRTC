@@ -357,7 +357,17 @@ def run_hyp3(args: argparse.Namespace):
     rtc_t1 = perf_counter()
     log.info('Staging data took %.2f minutes', (rtc_t1 - rtc_t0) / 60)
 
-    log.info('running multirtc with granule=%s and dem=%s', granule_name, dem_name)
+    log.info(
+        'running multirtc() with platform=%s, granule=%s, resolution=%s, subset=%s, work_dir=%s and dem=%s',
+        args.platform,
+        granule_name,
+        args.resolution,
+        args.subset,
+        args.work_dir,
+        str(input_dir / dem_name),
+    )
+    log.info('contents of workdir: %s', list(Path(args.work_dir).iterdir()))
+    log.info('contents of inputdir: %s', list(input_dir.iterdir()))
     run_multirtc(
         args.platform,
         granule_name,
