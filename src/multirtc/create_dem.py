@@ -607,13 +607,13 @@ def download_geodata_cooperative_dem_for_tiles(output_path: Path, tilesfile, buf
         input_files = []
         for row in tiles:
             zone = row[0:2]
-            nume = row[2:4]
+            # nume = row[2:4]
             file = f'U_{row}_30km_2012_ArcticPS_NGA_DTM_3m_01.tif'
             # s3_object_key = f'DGED5b/UTM_{zone}/{nume}/{file}'
             for s3_object_key in my_bucket.objects.filter(Prefix=f'DGED5b/UTM_{zone}').all():
-                   if s3_object_key.key.endswith(file):
-                        client.download_file(bucket_name, s3_object_key.key, f'{temp_dir}/{file}')
-                        break
+                if s3_object_key.key.endswith(file):
+                    client.download_file(bucket_name, s3_object_key.key, f'{temp_dir}/{file}')
+                    break
             if Path(f'{temp_dir}/{file}').exists():
                 # convert to EPSG:32606
                 # gdal.Warp(f'{temp_dir}/{file}', f'{temp_dir}/{file_tmp}', dstSRS='EPSG:32606', resampleAlg='near')
