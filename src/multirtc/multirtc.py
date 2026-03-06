@@ -9,16 +9,17 @@ from time import perf_counter
 import boto3
 import numpy as np
 from burst2safe.burst2safe import burst2safe
+from hyp3lib.aws import upload_file_to_s3
 from s1reader.s1_orbit import retrieve_orbit_file
 from sarpy.utils import convert_to_sicd
 
-from hyp3lib.aws import upload_file_to_s3
 from multirtc import create_dem
 from multirtc.base import Slc
 from multirtc.create_rtc import rtc
 from multirtc.rtc_options import RtcOptions
 from multirtc.sentinel1 import S1BurstSlc
 from multirtc.sicd import SicdPfaSlc, SicdRzdSlc
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -267,7 +268,9 @@ def create_parser(parser):
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     # Hyp3 args:
     parser.add_argument('--hyp3', type=str, default=None, help='Runs in Hyp3 mode')
-    parser.add_argument('--do-not-upload-rtc', type=str, default=None, help='Do not upload RTC to S3. Useful for dev work.')
+    parser.add_argument(
+        '--do-not-upload-rtc', type=str, default=None, help='Do not upload RTC to S3. Useful for dev work.'
+    )
     parser.add_argument('--bucket', type=str, default=None, help='AWS S3 bucket HyP3 for upload the final product(s)')
     parser.add_argument('--bucket-prefix', type=str, default=None, help='Add a bucket prefix to product(s)')
 
@@ -389,7 +392,9 @@ def run_hyp3(args: argparse.Namespace):
             log.info(f'uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name}')
             upload_file_to_s3(Path(file), bucket, bucket_prefix)
         else:
-            log.warning(f'NOT uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name} because --do-not-upload-rtc is set')
+            log.warning(
+                f'NOT uploading {file} to s3://{bucket}/{bucket_prefix}/{Path(file).name} because --do-not-upload-rtc is set'
+            )
     log.info('upload time: %.2f minutes', (perf_counter() - rtc_t2) / 60)
 
     # At time of this coding, Hyp3 can only classify a few filetypes as products and return them in the find_jobs()
