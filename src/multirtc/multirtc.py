@@ -2,6 +2,7 @@
 
 import argparse
 import glob
+import json
 import logging
 from pathlib import Path
 from time import perf_counter
@@ -12,6 +13,7 @@ from burst2safe.burst2safe import burst2safe
 from hyp3lib.aws import upload_file_to_s3
 from s1reader.s1_orbit import retrieve_orbit_file
 from sarpy.utils import convert_to_sicd
+from shapely.geometry import Polygon
 
 from multirtc import create_dem
 from multirtc.base import Slc
@@ -94,6 +96,14 @@ def get_slc(platform: str, granule: str, input_dir: Path) -> Slc:
     return slc
 
 
+def get_umbra_shape(jsonfile):
+    with open(jsonfile) as f:
+        data = json.load(f)
+        coords = np.array(data['geometry']['coordinates'][0])[:, 0:2]
+        poly = Polygon(coords)
+    return poly
+
+
 def run_multirtc(
     platform: str,
     granule: str,
@@ -117,6 +127,16 @@ def run_multirtc(
     input_dir, output_dir = prep_dirs(work_dir)
     slc = get_slc(platform, granule, input_dir)
     poly = slc.footprint
+
+    if platform == 'UMBRA':
+        filter = f'{granule.split("_")[0]}_{granule.split("_")[1]}.*.json'
+        for file in work_dir.rglob(filter):
+            try:
+                poly = get_umbra_shape(file)
+                break
+            except Exception:
+                pass
+
     if dem_path is None:
         dem_path = input_dir / 'dem.tif'
         create_dem.download_opera_dem_for_footprint(dem_path, slc.footprint)
@@ -264,7 +284,9 @@ def create_parser(parser):
     parser.add_argument(
         '--subset', nargs='*', type=float, default=[], help='Min_lon, Min_lat, Max_lon, Max_lat (degree)'
     )
-    parser.add_argument('--dem', type=str, default=None, help='Path to the DEM to use for processing or S3 URI if hyp3')
+    parser.add_argument(
+        '--dem', type=Path, default=None, help='Path to the DEM to use for processing or S3 URI if hyp3'
+    )
     parser.add_argument('--work-dir', type=Path, default=None, help='Working directory for processing')
     # Hyp3 args:
     parser.add_argument('--hyp3', type=str, default=None, help='Runs in Hyp3 mode')
