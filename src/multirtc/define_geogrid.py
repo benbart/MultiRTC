@@ -137,8 +137,8 @@ def generate_geogrids(
         max_height = isce3.core.MAXIMUM_HEIGHT
     else:
         with rasterio.open(str(dem_path)) as src:
-              min_height = (src.stats()[0]).min
-              max_height = (src.stats()[0]).max
+            min_height = (src.stats()[0]).min
+            max_height = (src.stats()[0]).max
 
     geogrid = isce3.product.bbox_to_geogrid(
         slc.radar_grid,
