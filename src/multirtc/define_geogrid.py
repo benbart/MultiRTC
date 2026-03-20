@@ -136,15 +136,9 @@ def generate_geogrids(
         min_height = isce3.core.MINIMUM_HEIGHT
         max_height = isce3.core.MAXIMUM_HEIGHT
     else:
-        dem_raster = isce3.io.Raster(str(dem_path))
-        dem = isce3.geometry.DEMInterpolator()
-        # FIXME: figure out why load with bounds doesn't work
-        # minx, miny, maxx, maxy = slc.footprint.bounds
-        # dem.load_dem(dem_raster, min_x=minx, max_x=maxx, min_y=miny, max_y=maxy)
-        dem.load_dem(dem_raster)
-        dem.compute_min_max_mean_height()
-        min_height = dem.min_height
-        max_height = dem.max_height
+        with rasterio.open(str(dem_path)) as src:
+            min_height = (src.stats()[0]).min
+            max_height = (src.stats()[0]).max
 
     geogrid = isce3.product.bbox_to_geogrid(
         slc.radar_grid,
