@@ -32,7 +32,7 @@ class RtcOptions:
     upsample_radar_grid: bool = False
     rtc_algorithm_type: str = 'area_projection'  # 'area_projection' or 'bilinear_distribution'
     input_terrain_radiometry: str = 'beta0'
-    rtc_min_value_db: float = -30.0
+    rtc_min_value_db: float = -100.0
     rtc_upsampling: int = 2
     rtc_area_beta_mode: str = 'auto'
     geo2rdr_threshold: float = 1.0e-7
